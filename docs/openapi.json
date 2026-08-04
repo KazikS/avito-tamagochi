@@ -1,0 +1,907 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Авито Питомец — API",
+    "version": "1.0.0",
+    "description": "Контракт фронт ↔ бэк.\n\nПРАВИЛА, ОБЯЗАТЕЛЬНЫЕ ДЛЯ ОБЕИХ СТОРОН:\n1. Клиент НЕ передаёт XP, уровень, прогресс задач, значения показателей. Только факт действия и его идентификатор.\n2. Все расчёты (decay, XP, уровень, настроение, стрик, право на награду) — на сервере.\n3. Порядок множителей: XP = базовый × множитель_настроения × множитель_стрика. Настроение берётся ПОСЛЕ изменения показателя. Округление вниз до целого.\n4. Показатели целые 0..100, потолок жёсткий: 82 + 30 = 100, остаток сгорает.\n5. Суточный потолок ухода обрезает последнее действие ЧАСТИЧНО (осталось 5 из 40 — начисляем 5, не 0).\n6. Сутки и стрик считаются по timezone аккаунта, а не по времени устройства.\n7. Все ответы в конверте { data, meta }.",
+    "contact": { "name": "Фронтенд", "email": "frontend@avito-pet.local" }
+  },
+
+  "servers": [
+    { "url": "https://api.avito-pet.local/api/v1", "description": "прод" },
+    { "url": "http://localhost:8080/api/v1", "description": "локально через docker-compose" }
+  ],
+
+  "security": [ { "bearerAuth": [] } ],
+
+  "tags": [
+    { "name": "auth",     "description": "Аккаунт и токены" },
+    { "name": "config",   "description": "Справочник экономики — чтобы фронт не хардкодил числа" },
+    { "name": "pet",      "description": "Питомец: сытость, радость, чистота, энергия" },
+    { "name": "tasks",    "description": "Задачи и события активности в Авито" },
+    { "name": "streak",   "description": "Серия дней и вехи" },
+    { "name": "cosmetics","description": "Косметика: скины, аксессуары, фоны" },
+    { "name": "rewards",  "description": "Награды и промокоды" },
+    { "name": "social",   "description": "Лидерборд и сводка дня" },
+    { "name": "demo",     "description": "Только при DEMO_MODE=true. В проде 404" }
+  ],
+
+  "paths": {
+
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"], "summary": "Регистрация", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["nickname", "timezone"],
+          "properties": {
+            "nickname": { "type": "string", "minLength": 2, "maxLength": 24 },
+            "timezone": { "type": "string", "examples": ["Europe/Moscow"] }
+          } } } } },
+        "responses": {
+          "200": { "description": "Токены и профиль", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/AuthResult" } } } ] } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"], "summary": "Вход", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["nickname"],
+          "properties": { "nickname": { "type": "string" } } } } } },
+        "responses": {
+          "200": { "description": "Токены и профиль", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/AuthResult" } } } ] } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/refresh": {
+      "post": {
+        "tags": ["auth"], "summary": "Обновить access-токен", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["refreshToken"],
+          "properties": { "refreshToken": { "type": "string" } } } } } },
+        "responses": {
+          "200": { "description": "Новая пара токенов", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Tokens" } } } ] } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/me": {
+      "get": {
+        "tags": ["auth"], "summary": "Текущий пользователь",
+        "responses": {
+          "200": { "description": "Профиль", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Me" } } } ] } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/config": {
+      "get": {
+        "tags": ["config"],
+        "summary": "Справочник экономики",
+        "description": "Фронт берёт отсюда скорость падения показателей, эффекты действий, пороги настроений, кривую уровней и множители стрика. Хардкодить эти числа в клиенте запрещено: при смене баланса разъедется. Кэшируется на сутки, поддерживает ETag.",
+        "responses": {
+          "200": { "description": "Константы экономики", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Config" } } } ] } } } }
+        }
+      }
+    },
+
+    "/pets/presets": {
+      "get": {
+        "tags": ["pet"], "summary": "Три расцветки для онбординга",
+        "responses": { "200": { "description": "Список пресетов", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "type": "array",
+              "items": { "$ref": "#/components/schemas/PetPreset" } } } } ] } } } } }
+      }
+    },
+
+    "/pets": {
+      "post": {
+        "tags": ["pet"], "summary": "Создать питомца",
+        "parameters": [ { "$ref": "#/components/parameters/IdempotencyKey" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["presetId"],
+          "properties": {
+            "presetId": { "$ref": "#/components/schemas/PresetId" },
+            "name": { "type": "string", "maxLength": 16 }
+          } } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/PetOk" },
+          "409": { "description": "Питомец уже создан", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+
+    "/pet": {
+      "get": {
+        "tags": ["pet"],
+        "summary": "Состояние питомца",
+        "description": "Сервер лениво досчитывает decay от pet.updatedAt до now и, если это первый вход за сутки, начисляет XP за вход. Крон для показателей не нужен.",
+        "responses": {
+          "200": { "$ref": "#/components/responses/PetOk" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Питомца ещё нет — вести на онбординг", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+
+    "/pet/actions": {
+      "post": {
+        "tags": ["pet"],
+        "summary": "Действие ухода",
+        "description": "Единственный способ поднять показатель. Возвращает ПОЛНОЕ состояние питомца, чтобы фронт не собирал его по кускам и не ловил гонки.\n\nstatCapped=true означает: показатель уже был 100 ДО действия, XP не начислен. Фронт всё равно проигрывает анимацию — эмоция бесплатная.\n\ncareXpCapReached=true означает: суточный потолок ухода исчерпан. Кнопки остаются активными, меняется только подпись.",
+        "parameters": [ { "$ref": "#/components/parameters/IdempotencyKey" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["kind", "actionId"],
+          "properties": {
+            "kind": { "$ref": "#/components/schemas/PetActionKind" },
+            "actionId": { "type": "string", "format": "uuid",
+              "description": "UUID с клиента. Защищает от двойного тапа: повтор возвращает прежний результат." }
+          } } } } },
+        "responses": {
+          "200": { "description": "Питомец обновлён", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ActionResult" } } } ] } } } },
+          "409": { "description": "ACTION_LIMIT_REACHED или PET_IS_SLEEPING", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+
+    "/tasks/today": {
+      "get": {
+        "tags": ["tasks"],
+        "summary": "Задачи дня",
+        "description": "Три задачи: одна care, одна setup, одна explore. Ротация в 04:00 по timezone аккаунта. Выдача зависит от segment: задачи продавца не показываем тем, у кого нет активных объявлений.",
+        "responses": { "200": { "description": "Список задач", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TasksToday" } } } ] } } } } }
+      }
+    },
+
+    "/tasks/{taskId}/open": {
+      "post": {
+        "tags": ["tasks"],
+        "summary": "Зафиксировать переход в Авито",
+        "description": "Не меняет прогресс. Только логирует намерение и отдаёт deepLink.",
+        "parameters": [ { "$ref": "#/components/parameters/TaskId" } ],
+        "responses": {
+          "200": { "description": "Ссылка", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "type": "object",
+                "properties": { "deepLink": { "type": "string", "format": "uri" } } } } } ] } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/activity/events": {
+      "post": {
+        "tags": ["tasks"],
+        "summary": "События активности — единственный способ двигать прогресс задач",
+        "description": "Эндпоинта «выполнить задачу» НЕ СУЩЕСТВУЕТ. Клиент сообщает факты, сервер сам решает, что они засчитывают.\n\nУСЛОВИЯ ЗАЧЁТА:\n· listing.viewed — dwellMs >= 8000 и объявление не засчитано ранее (навсегда, не за день);\n· listing.compared — минимум два разных listingId;\n· listing.favorited — не чаще одного раза в сутки;\n· задачи привязаны к categoryId, никогда к конкретному объявлению или продавцу.\n\nПОЛЕ source ОБЯЗАТЕЛЬНО. Значение gamified означает, что действие вызвано задачей. Бэк обязан пробросить флаг в аналитику Авито, и такие события ИСКЛЮЧАЮТСЯ из статистики продавца и из ранжирования — иначе геймификация создаёт фальшивый спрос.\n\nСобытия seller.contacted, ad.published, deal.completed, review.left начисляют XP, но НИКОГДА не выдаются как задачи: просить об этом значит спамить продавцов.\n\nВ MVP события шлёт фронт из встроенной ленты. В проде — шина событий Авито. Схема одна и та же.",
+        "parameters": [ { "$ref": "#/components/parameters/IdempotencyKey" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["events"],
+          "properties": { "events": { "type": "array", "minItems": 1, "maxItems": 20,
+            "items": { "$ref": "#/components/schemas/ActivityEvent" } } } } } } },
+        "responses": {
+          "200": { "description": "Пересчитанное состояние", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ActivityResult" } } } ] } } } },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+
+    "/streak": {
+      "get": {
+        "tags": ["streak"],
+        "summary": "Серия дней",
+        "description": "День засчитывается при выполнении хотя бы одной задачи ИЛИ двух действий ухода. Пересчёт в 04:00 по timezone. При пропуске автоматически списывается заморозка, если есть. Поле best никогда не уменьшается.",
+        "responses": { "200": { "description": "Состояние стрика", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Streak" } } } ] } } } } }
+      }
+    },
+
+    "/streak/milestones": {
+      "get": {
+        "tags": ["streak"], "summary": "Вехи хранилища стрика",
+        "responses": { "200": { "description": "Список вех", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "type": "array",
+              "items": { "$ref": "#/components/schemas/Milestone" } } } } ] } } } } }
+      }
+    },
+
+    "/cosmetics": {
+      "get": {
+        "tags": ["cosmetics"],
+        "summary": "Косметика — полученная и закрытая",
+        "description": "Косметика НЕ влияет на экономику: ни на XP, ни на показатели, ни на настроение. Только внешность. Бэк хранит assetKey, картинку рисует фронт — добавление скина не требует деплоя бэка.",
+        "responses": { "200": { "description": "Список предметов", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "type": "array",
+              "items": { "$ref": "#/components/schemas/Cosmetic" } } } } ] } } } } }
+      }
+    },
+
+    "/cosmetics/{cosmeticId}/equip": {
+      "post": {
+        "tags": ["cosmetics"],
+        "summary": "Надеть предмет",
+        "description": "Один предмет на слот: надевание второго вытесняет первый.",
+        "parameters": [ { "$ref": "#/components/parameters/CosmeticId" } ],
+        "responses": {
+          "200": { "description": "Питомец и инвентарь обновлены", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+              { "type": "object", "properties": { "data": { "type": "object", "properties": {
+                "pet": { "$ref": "#/components/schemas/Pet" },
+                "cosmetics": { "type": "array", "items": { "$ref": "#/components/schemas/Cosmetic" } }
+              } } } } ] } } } },
+          "403": { "description": "COSMETIC_NOT_OWNED", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+
+    "/cosmetics/{cosmeticId}/unequip": {
+      "post": {
+        "tags": ["cosmetics"], "summary": "Снять предмет",
+        "parameters": [ { "$ref": "#/components/parameters/CosmeticId" } ],
+        "responses": { "200": { "description": "Обновлено", "content": { "application/json": { "schema": {
+          "$ref": "#/components/schemas/Envelope" } } } } }
+      }
+    },
+
+    "/rewards": {
+      "get": {
+        "tags": ["rewards"],
+        "summary": "Награды",
+        "description": "promoCode ОТСУТСТВУЕТ, пока status не claimed или used. До получения фронт рисует маску. Иначе коды собираются скрейпингом.\n\nconditionLabel и etaDays считает сервер: фронт не склеивает фразы из чисел, иначе смена экономики потребует правки клиента.",
+        "parameters": [ { "name": "status", "in": "query", "required": false,
+          "schema": { "$ref": "#/components/schemas/RewardStatus" } } ],
+        "responses": { "200": { "description": "Список наград", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "type": "array",
+              "items": { "$ref": "#/components/schemas/Reward" } } } } ] } } } } }
+      }
+    },
+
+    "/rewards/next": {
+      "get": {
+        "tags": ["rewards"], "summary": "Ближайшая награда по прогрессу",
+        "responses": { "200": { "description": "Награда", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Reward" } } } ] } } } } }
+      }
+    },
+
+    "/rewards/{rewardId}/claim": {
+      "post": {
+        "tags": ["rewards"],
+        "summary": "Забрать награду",
+        "description": "Идемпотентно. Повтор с ТЕМ ЖЕ Idempotency-Key возвращает 200 и тот же промокод.\n\nПри другом ключе по уже полученной награде возвращается 409 REWARD_ALREADY_CLAIMED, но в data лежит ТОТ ЖЕ промокод — фронт открывает шит с кодом, а не показывает ошибку.\n\nЕсли tier=cosmetic, сервер сразу выдаёт предмет и шлёт по сокету cosmetic.granted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/RewardId" },
+          { "$ref": "#/components/parameters/IdempotencyKeyRequired" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/RewardOk" },
+          "403": { "description": "REWARD_NOT_ELIGIBLE — условие не выполнено", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "409": { "description": "REWARD_ALREADY_CLAIMED. В data — та же награда с промокодом", "content": { "application/json": { "schema": {
+            "allOf": [ { "$ref": "#/components/schemas/ErrorEnvelope" },
+              { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Reward" } } } ] } } } },
+          "410": { "description": "REWARD_EXPIRED", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+
+    "/rewards/{rewardId}/redeem-click": {
+      "post": {
+        "tags": ["rewards"],
+        "summary": "Лог перехода «Применить на Авито»",
+        "description": "Метрика конверсии. Реальное погашение происходит на стороне Авито, статус переходит в used отдельным серверным событием.",
+        "parameters": [ { "$ref": "#/components/parameters/RewardId" } ],
+        "responses": { "204": { "description": "Записано" } }
+      }
+    },
+
+    "/summary/daily": {
+      "get": {
+        "tags": ["social"],
+        "summary": "Сводка дня",
+        "description": "Решение о показе принимает СЕРВЕР через поле shouldShow. Клиент не вычисляет «наступил ли вечер»: перевод часов на устройстве сломал бы логику.",
+        "parameters": [ { "name": "date", "in": "query", "required": false,
+          "schema": { "type": "string", "format": "date" } } ],
+        "responses": { "200": { "description": "Сводка", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/DailySummary" } } } ] } } } } }
+      }
+    },
+
+    "/summary/daily/seen": {
+      "post": {
+        "tags": ["social"], "summary": "Отметить сводку просмотренной",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["date"],
+          "properties": { "date": { "type": "string", "format": "date" } } } } } },
+        "responses": { "204": { "description": "Записано" } }
+      }
+    },
+
+    "/leaderboard": {
+      "get": {
+        "tags": ["social"],
+        "summary": "Лидерборд",
+        "description": "Поле me приходит ОТДЕЛЬНО от items, независимо от страницы: иначе свою строку пришлось бы искать по всем страницам. Ранжирование по XP за 7 дней, тай-брейк — длина стрика. Отдаются только публичные поля.",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true,
+            "schema": { "type": "string", "enum": ["league", "friends", "top"] } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 25, "maximum": 50 } }
+        ],
+        "responses": { "200": { "description": "Страница лидерборда", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/LeaderboardPage" } } } ] } } } } }
+      }
+    },
+
+    "/profile": {
+      "get": {
+        "tags": ["social"], "summary": "Профиль: стрик, статистика, счётчики",
+        "responses": { "200": { "description": "Профиль", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Profile" } } } ] } } } } }
+      }
+    },
+
+    "/demo/advance-day": {
+      "post": {
+        "tags": ["demo"],
+        "summary": "Прокрутить сутки",
+        "description": "Только при DEMO_MODE=true, иначе 404. Нужен, чтобы показать жюри вехи на 100 и 500 дней за пять минут защиты: прокручивает decay, стрик, ротацию задач и сборку сводки.",
+        "requestBody": { "required": false, "content": { "application/json": { "schema": {
+          "type": "object", "properties": { "days": { "type": "integer", "default": 1, "maximum": 30 } } } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/PetOk" },
+          "404": { "description": "Демо-режим выключен" }
+        }
+      }
+    }
+  },
+
+  "components": {
+
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key", "in": "header", "required": false,
+        "schema": { "type": "string", "format": "uuid" },
+        "description": "UUID с клиента. Повтор с тем же ключом возвращает прежний результат, а не ошибку."
+      },
+      "IdempotencyKeyRequired": {
+        "name": "Idempotency-Key", "in": "header", "required": true,
+        "schema": { "type": "string", "format": "uuid" },
+        "description": "Обязателен: ретрай при плохой сети не должен выдать второй промокод."
+      },
+      "TaskId":     { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "RewardId":   { "name": "rewardId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "CosmeticId": { "name": "cosmeticId", "in": "path", "required": true, "schema": { "type": "string" } }
+    },
+
+    "responses": {
+      "PetOk": {
+        "description": "Состояние питомца",
+        "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Pet" } } } ] } } }
+      },
+      "RewardOk": {
+        "description": "Награда",
+        "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Envelope" },
+            { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Reward" } } } ] } } }
+      },
+      "Unauthorized": {
+        "description": "UNAUTHORIZED или TOKEN_EXPIRED. На TOKEN_EXPIRED фронт делает refresh и повторяет запрос один раз",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "ValidationError": {
+        "description": "VALIDATION_ERROR",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "NotFound": {
+        "description": "NOT_FOUND",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "RateLimited": {
+        "description": "ACTION_RATE_LIMITED. В meta.retryAfterSec — через сколько можно повторить",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      }
+    },
+
+    "schemas": {
+
+      "Envelope": {
+        "type": "object", "required": ["meta"],
+        "properties": {
+          "data": { "description": "Полезная нагрузка. null при ошибке" },
+          "meta": { "$ref": "#/components/schemas/Meta" }
+        }
+      },
+
+      "Meta": {
+        "type": "object", "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "integer", "description": "ВСЕГДА число, дублирует HTTP-статус", "examples": [200] },
+          "message": { "type": "string", "description": "Текст для пользователя, на русском" },
+          "error": { "$ref": "#/components/schemas/ErrorCode" },
+          "requestId": { "type": "string", "format": "uuid",
+            "description": "Эхо заголовка X-Request-Id. По нему бэк находит лог по скриншоту бага" },
+          "retryAfterSec": { "type": "integer", "description": "Только при 429" }
+        }
+      },
+
+      "ErrorEnvelope": {
+        "type": "object", "required": ["meta"],
+        "properties": { "data": { "type": "null" }, "meta": { "$ref": "#/components/schemas/Meta" } }
+      },
+
+      "ErrorCode": {
+        "type": "string",
+        "description": "Машинный код. Фронт ветвится ТОЛЬКО по нему: message перепишут при вычитке текстов, и клиент молча сломается.",
+        "enum": [
+          "VALIDATION_ERROR", "UNAUTHORIZED", "TOKEN_EXPIRED", "NOT_FOUND",
+          "PET_ALREADY_EXISTS", "PET_IS_SLEEPING", "ACTION_LIMIT_REACHED", "ACTION_RATE_LIMITED",
+          "EVENT_REJECTED", "REWARD_NOT_ELIGIBLE", "REWARD_ALREADY_CLAIMED", "REWARD_EXPIRED",
+          "COSMETIC_NOT_OWNED", "INTERNAL_ERROR"
+        ]
+      },
+
+      "Tokens": {
+        "type": "object", "required": ["accessToken", "refreshToken"],
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "expiresIn": { "type": "integer", "examples": [900] }
+        }
+      },
+
+      "AuthResult": {
+        "allOf": [ { "$ref": "#/components/schemas/Tokens" },
+          { "type": "object", "properties": { "user": { "$ref": "#/components/schemas/Me" } } } ]
+      },
+
+      "Me": {
+        "type": "object", "required": ["id", "nickname", "timezone", "segment", "onboardingCompleted"],
+        "properties": {
+          "id": { "type": "string" },
+          "nickname": { "type": "string" },
+          "avatarUrl": { "type": "string", "format": "uri" },
+          "timezone": { "type": "string", "examples": ["Europe/Moscow"] },
+          "segment": { "type": "string", "enum": ["buyer", "seller", "both"],
+            "description": "Определяет выдачу задач. Задачи продавца бессмысленны без активных объявлений" },
+          "onboardingCompleted": { "type": "boolean",
+            "description": "Флаг на сервере, а не в localStorage: иначе онбординг повторится на другом устройстве" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "PresetId": { "type": "string", "enum": ["green", "blue", "purple"] },
+
+      "PetPreset": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/PresetId" },
+          "name": { "type": "string", "examples": ["Ави"] },
+          "trait": { "type": "string", "examples": ["спокойный"] },
+          "colors": { "type": "object",
+            "description": "Четыре цвета логотипа Авито в ролях: тело, большое ухо, малое ухо, лапа",
+            "properties": {
+              "body": { "type": "string" }, "earL": { "type": "string" },
+              "earS": { "type": "string" }, "paw": { "type": "string" } } }
+        }
+      },
+
+      "StatKey": { "type": "string", "enum": ["hunger", "joy", "clean", "energy"] },
+
+      "Stats": {
+        "type": "object", "required": ["hunger", "joy", "clean", "energy"],
+        "description": "Целые 0..100. Потолок жёсткий: 82 + 30 = 100, остаток сгорает",
+        "properties": {
+          "hunger": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "joy":    { "type": "integer", "minimum": 0, "maximum": 100 },
+          "clean":  { "type": "integer", "minimum": 0, "maximum": 100 },
+          "energy": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      },
+
+      "PetActionKind": { "type": "string", "enum": ["feed", "play", "wash", "sleep", "wake"] },
+
+      "PetMood": {
+        "type": "string",
+        "description": "Производная от МИНИМАЛЬНОГО показателя. Клиент её не вычисляет",
+        "enum": ["radiant", "happy", "neutral", "sad", "sick", "sleeping"]
+      },
+
+      "ActionState": {
+        "type": "object", "required": ["remaining", "xpCapped"],
+        "properties": {
+          "remaining": { "type": "integer", "description": "Сколько раз ещё можно сегодня" },
+          "cooldownUntil": { "type": "string", "format": "date-time" },
+          "xpCapped": { "type": "boolean", "description": "Суточный потолок ухода исчерпан" }
+        }
+      },
+
+      "Pet": {
+        "type": "object",
+        "required": ["id", "presetId", "name", "level", "xp", "xpToNext", "totalXp",
+                     "stage", "stats", "mood", "moodMultiplier", "actions", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "presetId": { "$ref": "#/components/schemas/PresetId" },
+          "name": { "type": "string" },
+          "level": { "type": "integer", "minimum": 1, "maximum": 25 },
+          "xp": { "type": "integer", "description": "XP внутри текущего уровня" },
+          "xpToNext": { "type": "integer", "description": "round10(100 * 1.25^(level-1))" },
+          "totalXp": { "type": "integer" },
+          "stage": { "type": "integer", "enum": [1, 2, 3, 4] },
+          "stageLabel": { "type": "string", "examples": ["Искатель"] },
+          "stats": { "$ref": "#/components/schemas/Stats" },
+          "mood": { "$ref": "#/components/schemas/PetMood" },
+          "moodMultiplier": { "type": "number", "examples": [1.0] },
+          "streakMultiplier": { "type": "number", "examples": [1.2] },
+          "sleepUntil": { "type": "string", "format": "date-time" },
+          "actions": { "type": "object", "additionalProperties": { "$ref": "#/components/schemas/ActionState" } },
+          "equipped": { "type": "array", "items": { "type": "string" },
+            "description": "id надетой косметики" },
+          "nextStage": { "type": "object",
+            "properties": { "stage": { "type": "integer" }, "label": { "type": "string" },
+                            "atLevel": { "type": "integer" } } },
+          "updatedAt": { "type": "string", "format": "date-time",
+            "description": "Момент, на который посчитан decay. Точка отсчёта для следующего пересчёта" }
+        }
+      },
+
+      "ActionResult": {
+        "type": "object", "required": ["pet", "xpGained", "statCapped", "leveledUp"],
+        "properties": {
+          "pet": { "$ref": "#/components/schemas/Pet" },
+          "xpGained": { "type": "integer", "description": "Уже с множителями и округлением вниз" },
+          "statCapped": { "type": "boolean",
+            "description": "Показатель был 100 ДО действия. XP не начислен, анимацию всё равно играем" },
+          "careXpToday": { "type": "integer", "description": "Сколько XP ухода начислено за сутки" },
+          "careXpCapReached": { "type": "boolean" },
+          "leveledUp": { "type": "boolean" },
+          "unlockedRewardIds": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+
+      "TaskClass": {
+        "type": "string",
+        "description": "care — внутри игры; setup — нулевой след у других людей (сохранить поиск, обновить фото своего объявления); explore — слабый след (просмотры, сравнение, избранное); weekly — недельная",
+        "enum": ["care", "setup", "explore", "weekly"]
+      },
+
+      "Task": {
+        "type": "object",
+        "required": ["id", "class", "title", "icon", "xpReward", "progress", "status", "expiresAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "class": { "$ref": "#/components/schemas/TaskClass" },
+          "title": { "type": "string", "examples": ["Посмотри 3 объявления"] },
+          "subtitle": { "type": "string", "examples": ["в разделе «Электроника»"] },
+          "icon": { "type": "string", "description": "Ключ иконки, фронт рисует SVG сам" },
+          "xpReward": { "type": "integer" },
+          "progress": { "type": "object", "required": ["current", "target"],
+            "properties": { "current": { "type": "integer" }, "target": { "type": "integer" } } },
+          "status": { "type": "string", "enum": ["active", "completed", "expired"] },
+          "deepLink": { "type": "string", "format": "uri" },
+          "requiresEvent": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityType" } },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "TasksToday": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } },
+          "resetsAt": { "type": "string", "format": "date-time", "description": "04:00 по timezone аккаунта" }
+        }
+      },
+
+      "ActivityType": {
+        "type": "string",
+        "description": "Первые девять могут быть задачами. Последние четыре — только признания: дают XP, но никогда не выдаются как задача, иначе продавцы получат спам",
+        "enum": [
+          "listing.viewed", "listing.compared", "listing.favorited",
+          "search.saved", "profile.updated", "ad.photo_updated", "ad.delivery_enabled",
+          "autoteka.report_viewed", "delivery.section_opened",
+          "seller.contacted", "ad.published", "deal.completed", "review.left"
+        ]
+      },
+
+      "ActivityEvent": {
+        "type": "object", "required": ["eventId", "type", "occurredAt", "source"],
+        "properties": {
+          "eventId": { "type": "string", "format": "uuid", "description": "Для дедупликации" },
+          "type": { "$ref": "#/components/schemas/ActivityType" },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "source": { "type": "string", "enum": ["gamified", "organic"],
+            "description": "gamified означает «вызвано задачей». Бэк обязан пробросить флаг в аналитику: такие события исключаются из статистики продавца и из ранжирования" },
+          "payload": { "type": "object",
+            "properties": {
+              "listingId": { "type": "string" },
+              "listingIds": { "type": "array", "items": { "type": "string" } },
+              "categoryId": { "type": "string" },
+              "adId": { "type": "string" },
+              "dwellMs": { "type": "integer", "description": "Для listing.viewed зачёт от 8000" },
+              "queryHash": { "type": "string" },
+              "fields": { "type": "array", "items": { "type": "string" } }
+            } }
+        }
+      },
+
+      "ActivityResult": {
+        "type": "object",
+        "properties": {
+          "accepted": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+          "rejected": { "type": "array", "items": { "type": "object",
+            "properties": { "eventId": { "type": "string" },
+              "reason": { "type": "string",
+                "enum": ["DWELL_TOO_SHORT", "ALREADY_COUNTED", "NO_MATCHING_TASK", "DAILY_LIMIT", "DUPLICATE"] } } } },
+          "tasks": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } },
+          "xpGained": { "type": "integer" },
+          "pet": { "$ref": "#/components/schemas/Pet" },
+          "leveledUp": { "type": "boolean" },
+          "unlockedRewardIds": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+
+      "Streak": {
+        "type": "object", "required": ["current", "best", "freezes", "todayCounted", "multiplier"],
+        "properties": {
+          "current": { "type": "integer" },
+          "best": { "type": "integer", "description": "Никогда не уменьшается" },
+          "freezes": { "type": "integer", "minimum": 0, "maximum": 2 },
+          "todayCounted": { "type": "boolean" },
+          "multiplier": { "type": "number", "examples": [1.2],
+            "description": "1–6 дн ×1.0 · 7–13 ×1.1 · 14–29 ×1.2 · 30–99 ×1.3 · 100–499 ×1.4 · 500+ ×1.5" },
+          "frozenUsed": { "type": "boolean", "description": "Заморозка списана автоматически — сказать честно в сводке" },
+          "broken": { "type": "boolean" },
+          "nextMilestone": { "type": "object",
+            "properties": { "days": { "type": "integer" }, "title": { "type": "string" },
+                            "daysLeft": { "type": "integer" }, "rewardId": { "type": "string" } } }
+        }
+      },
+
+      "Milestone": {
+        "type": "object",
+        "properties": {
+          "days": { "type": "integer", "examples": [100] },
+          "title": { "type": "string", "examples": ["Сотня"] },
+          "status": { "type": "string", "enum": ["passed", "current", "locked"] },
+          "rewardId": { "type": "string" }
+        }
+      },
+
+      "CosmeticSlot": { "type": "string", "enum": ["skin", "accessory", "background", "frame"] },
+      "Rarity": { "type": "string", "enum": ["common", "rare", "legendary"] },
+
+      "Cosmetic": {
+        "type": "object", "required": ["id", "slot", "name", "rarity", "assetKey", "owned", "equipped"],
+        "properties": {
+          "id": { "type": "string" },
+          "slot": { "$ref": "#/components/schemas/CosmeticSlot" },
+          "name": { "type": "string", "examples": ["Шарф исследователя"] },
+          "rarity": { "$ref": "#/components/schemas/Rarity" },
+          "assetKey": { "type": "string", "examples": ["scarf_explorer"],
+            "description": "Ключ, по которому фронт рисует SVG. Бэк картинок не хранит" },
+          "owned": { "type": "boolean" },
+          "equipped": { "type": "boolean" },
+          "source": { "type": "object",
+            "properties": { "type": { "type": "string", "enum": ["level", "streak", "reward"] },
+                            "label": { "type": "string", "examples": ["Веха 7 дней"] } } },
+          "lockedHint": { "type": "string", "examples": ["Откроется на 10 уровне"] },
+          "obtainedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "RewardTier": {
+        "type": "string",
+        "description": "cosmetic — себестоимость 0 · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100",
+        "enum": ["cosmetic", "soft", "premium"]
+      },
+
+      "RewardStatus": { "type": "string", "enum": ["locked", "available", "claimed", "used", "expired"] },
+
+      "Reward": {
+        "type": "object",
+        "required": ["id", "tier", "title", "conditionLabel", "progress", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "tier": { "$ref": "#/components/schemas/RewardTier" },
+          "title": { "type": "string", "examples": ["Скидка 20% на Авито Доставку"] },
+          "description": { "type": "string" },
+          "conditionLabel": { "type": "string", "examples": ["Достигни 10 уровня"],
+            "description": "ГОТОВЫЙ текст с сервера. Фронт не склеивает фразы из чисел" },
+          "progress": { "type": "object", "required": ["current", "target", "unit"],
+            "properties": { "current": { "type": "integer" }, "target": { "type": "integer" },
+              "unit": { "type": "string", "enum": ["level", "day", "task"] } } },
+          "etaDays": { "type": "integer", "description": "Оценка сервера по темпу пользователя" },
+          "status": { "$ref": "#/components/schemas/RewardStatus" },
+          "cosmeticId": { "type": "string", "description": "Если tier=cosmetic" },
+          "promoCode": { "type": "string", "examples": ["AVI-7K3M-92XQ"],
+            "description": "ТОЛЬКО при status claimed или used. В остальных случаях поле отсутствует" },
+          "redeemUrl": { "type": "string", "format": "uri" },
+          "claimedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "DailySummary": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "shouldShow": { "type": "boolean", "description": "Решает сервер, не клиент" },
+          "xpTotal": { "type": "integer" },
+          "multiplier": { "type": "number" },
+          "breakdown": { "type": "array", "items": { "type": "object",
+            "properties": { "key": { "type": "string" }, "label": { "type": "string" },
+                            "count": { "type": "integer" }, "xp": { "type": "integer" } } } },
+          "streak": { "$ref": "#/components/schemas/Streak" },
+          "pet": { "type": "object",
+            "properties": {
+              "levelBefore": { "type": "integer" }, "levelAfter": { "type": "integer" },
+              "moodBefore": { "$ref": "#/components/schemas/PetMood" },
+              "moodAfter": { "$ref": "#/components/schemas/PetMood" },
+              "statsAfter": { "$ref": "#/components/schemas/Stats" } } },
+          "tomorrow": { "type": "object",
+            "properties": {
+              "tasks": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } },
+              "streakWillBe": { "type": "integer" },
+              "multiplierWillBe": { "type": "number" },
+              "nextReward": { "$ref": "#/components/schemas/Reward" } } },
+          "aiNote": { "type": "string",
+            "description": "Персональная фраза от питомца. Генерируется на бэке: ключи LLM не должны попасть в браузер" }
+        }
+      },
+
+      "LeaderboardEntry": {
+        "type": "object",
+        "properties": {
+          "rank": { "type": "integer" },
+          "userId": { "type": "string" },
+          "nickname": { "type": "string" },
+          "presetId": { "$ref": "#/components/schemas/PresetId" },
+          "level": { "type": "integer" },
+          "weeklyXp": { "type": "integer" },
+          "streak": { "type": "integer" },
+          "isMe": { "type": "boolean" }
+        }
+      },
+
+      "LeaderboardPage": {
+        "type": "object",
+        "properties": {
+          "scope": { "type": "string", "enum": ["league", "friends", "top"] },
+          "league": { "type": "object",
+            "properties": { "id": { "type": "string" }, "name": { "type": "string" },
+              "endsAt": { "type": "string", "format": "date-time" },
+              "promoteCount": { "type": "integer" }, "relegateCount": { "type": "integer" } } },
+          "me": { "$ref": "#/components/schemas/LeaderboardEntry" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/LeaderboardEntry" } },
+          "nextCursor": { "type": "string" }
+        }
+      },
+
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/Me" },
+          "pet": { "$ref": "#/components/schemas/Pet" },
+          "streak": { "$ref": "#/components/schemas/Streak" },
+          "stats": { "type": "object",
+            "properties": {
+              "daysInGame": { "type": "integer" }, "careActions": { "type": "integer" },
+              "tasksCompleted": { "type": "integer" }, "rewardsClaimed": { "type": "integer" },
+              "avgXpPerDay": { "type": "integer" } } },
+          "activity": { "type": "array", "description": "Хитмап за 30 дней",
+            "items": { "type": "object",
+              "properties": { "date": { "type": "string", "format": "date" },
+                              "value": { "type": "integer" } } } }
+        }
+      },
+
+      "Config": {
+        "type": "object",
+        "properties": {
+          "stats": { "type": "object", "additionalProperties": { "type": "object",
+            "properties": { "label": { "type": "string" }, "decayPerHour": { "type": "number" },
+                            "color": { "type": "string" } } } },
+          "actions": { "type": "object", "additionalProperties": { "type": "object",
+            "properties": { "label": { "type": "string" }, "stat": { "$ref": "#/components/schemas/StatKey" },
+                            "effect": { "type": "integer" }, "xp": { "type": "integer" },
+                            "dailyLimit": { "type": "integer" } } } },
+          "dailyCareXpCap": { "type": "integer", "examples": [40] },
+          "moods": { "type": "array", "items": { "type": "object",
+            "properties": { "id": { "$ref": "#/components/schemas/PetMood" }, "label": { "type": "string" },
+                            "minStat": { "type": "integer" }, "multiplier": { "type": "number" } } } },
+          "levelCurve": { "type": "object",
+            "properties": { "base": { "type": "integer", "examples": [100] },
+                            "factor": { "type": "number", "examples": [1.25] },
+                            "roundTo": { "type": "integer", "examples": [10] },
+                            "maxLevel": { "type": "integer", "examples": [25] } } },
+          "streakTiers": { "type": "array", "items": { "type": "object",
+            "properties": { "from": { "type": "integer" }, "multiplier": { "type": "number" } } } },
+          "milestones": { "type": "array", "items": { "$ref": "#/components/schemas/Milestone" } }
+        }
+      }
+    }
+  },
+
+  "x-websocket": {
+    "url": "wss://api.avito-pet.local/ws?token={accessToken}",
+    "description": "Сокет ничего не считает — только рассылает то, что уже посчитал REST-слой. Любое состояние можно получить обычным запросом, сокет лишь избавляет от поллинга.",
+    "envelope": {
+      "type": "object",
+      "required": ["eventId", "seq", "type", "ts", "payload"],
+      "properties": {
+        "eventId": { "type": "string", "format": "uuid", "description": "Дедупликация при переподключении" },
+        "seq": { "type": "integer", "description": "Монотонный на пользователя. Событие с меньшим seq игнорируется" },
+        "type": { "type": "string" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": { "type": "object" }
+      }
+    },
+    "serverEvents": {
+      "pet.stats":       { "payload": { "stats": "Stats", "mood": "PetMood", "moodMultiplier": "number", "updatedAt": "date-time" }, "when": "тик decay, пробуждение. Слать только при реальном изменении" },
+      "xp.gained":       { "payload": { "amount": "int", "source": "string", "level": "int", "xp": "int", "xpToNext": "int", "totalXp": "int" }, "when": "любое начисление" },
+      "level.up":        { "payload": { "level": "int", "stage": "int", "stageChanged": "bool", "unlockedRewardIds": "string[]" }, "when": "повышение уровня" },
+      "task.progress":   { "payload": { "taskId": "string", "current": "int", "target": "int" }, "when": "засчитано событие активности" },
+      "task.completed":  { "payload": { "taskId": "string", "xpReward": "int" }, "when": "задача закрыта" },
+      "streak.updated":  { "payload": "Streak", "when": "смена суток, списана заморозка" },
+      "cosmetic.granted":{ "payload": { "cosmeticId": "string", "name": "string", "rarity": "Rarity", "source": "object" }, "when": "выдан предмет" },
+      "reward.unlocked": { "payload": { "rewardId": "string", "title": "string", "tier": "RewardTier" }, "when": "награда стала доступна" },
+      "summary.ready":   { "payload": { "date": "date" }, "when": "сводка дня собрана" },
+      "pong":            { "payload": {}, "when": "ответ на ping" }
+    },
+    "clientMessages": {
+      "ping":   { "payload": {}, "when": "каждые 25 секунд" },
+      "resume": { "payload": { "lastSeq": "int" }, "when": "после переподключения" }
+    },
+    "rules": [
+      "Три события могут прийти одним пакетом (task.completed + level.up + reward.unlocked). Фронт ставит их в очередь и показывает по одному, иначе анимации накладываются.",
+      "leaderboard.updated батчится, не чаще одного раза в 10 секунд.",
+      "На resume сервер досылает пропущенное или отвечает { resync: true } — тогда фронт делает полный рефетч.",
+      "Протухший токен — закрытие кодом 4401, чтобы фронт сделал refresh, а не бесконечный реконнект.",
+      "Если сокет не поднялся три раза подряд, фронт переходит на поллинг GET /pet раз в 20 секунд. Продукт остаётся рабочим на плохой сети и на демо у жюри."
+    ]
+  }
+}
