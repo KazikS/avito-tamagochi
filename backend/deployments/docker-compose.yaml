@@ -1,4 +1,18 @@
 services:
+  postgres:
+    image: postgres:17
+    container_name: postgres_container
+    environment:
+      - POSTGRES_USER=_userspgs_user
+      - POSTGRES_DB=users_db
+      - POSTGRES_PASSWORD=1234
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata/beers_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+
   server:
     container_name: server
     build:
