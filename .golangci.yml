@@ -1,0 +1,53 @@
+version: "2"
+
+issues:
+  max-same-issues: 50
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - errorlint
+    - gosec
+    - gocritic
+    - ineffassign
+    - unused
+    - bodyclose
+    - sqlclosecheck
+    - rowserrcheck
+    - durationcheck
+    - exhaustive
+    - makezero
+    - nilerr
+    - unconvert
+    - revive
+
+  settings:
+    gocritic:
+      settings:
+        captLocal:
+          paramsOnly: false
+        underef:
+          skipRecvDeref: false
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+      settings:
+        shadow:
+          strict: true
+
+    errcheck:
+      check-type-assertions: true
+
+    exhaustive:
+      check:
+        - switch
+        - map
+
+  exclusions:
+    paths:
+      - configs
+      - deployments

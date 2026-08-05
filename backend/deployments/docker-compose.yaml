@@ -1,0 +1,14 @@
+services:
+  server:
+    container_name: server
+    build:
+      context: ../../
+      dockerfile: backend/build/package/Dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge
