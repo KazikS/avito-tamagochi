@@ -33,9 +33,20 @@ down:
 dev: up  ## стек + мок контракта для фронта (Prism на :4010)
 	npx --yes @stoplight/prism-cli mock docs/openapi.json -p 4010
 
-gen:  ## регенерация из контракта. ВНИМАНИЕ: кодоген ещё не подключён, сегодня это no-op
+gen:  ## регенерация типов из docs/openapi.json (Go + TS)
 	cd backend && go generate ./...
-	@if [ -d frontend ]; then cd frontend && npx rtk-query-codegen-openapi openapi-config.ts; else echo "gen: frontend/ ещё нет, пропуск"; fi
+	@echo "gen: Go-типы -> backend/internal/api/types.gen.go"
+	@# Условие по СКРИПТУ, а не по каталогу frontend/: каталог уже есть в dev, а
+	@# скрипт приезжает отдельно. Генерирует фронт сам (openapi-typescript, версия
+	@# запинена внутри скрипта) — здесь только вызов, чтобы contract-drift ловил
+	@# расхождение и на фронте тоже.
+	@if ! [ -f frontend/package.json ] || ! grep -q '"gen:api"' frontend/package.json; then \
+		echo "gen: скрипта frontend gen:api ещё нет в дереве — TS-типы пропущены"; \
+	elif command -v npm >/dev/null 2>&1; then \
+		npm --prefix frontend run gen:api; \
+	else \
+		echo "gen: npm не установлен — TS-типы НЕ перегенерированы (бэкенду Node не нужен, гейт всё равно в CI)"; \
+	fi
 
 migrate:  ## накатить миграции (goose — уже используется в feat/auth)
 	cd backend && goose -dir migrations postgres "$$DATABASE_URL" up

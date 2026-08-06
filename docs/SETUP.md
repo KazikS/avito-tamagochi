@@ -51,13 +51,12 @@ make setup
 ```bash
 # goose — нужен только для make migrate
 go install github.com/pressly/goose/v3/cmd/goose@latest
-
-# oapi-codegen — понадобится, когда подключат кодоген из контракта
-go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 ```
 
-`govulncheck` ставить не нужно вовсе: `make vuln` запускает его через `go run`,
-как и CI.
+`govulncheck` и `oapi-codegen` ставить не нужно вовсе: `make vuln` и `make gen`
+запускают их через `go run`, как и CI. Для кодогена это не мелочь: версия
+запинена в `//go:generate` (`backend/internal/api/gen.go`), а установленный
+глобально `@latest` дал бы другой вывод и красный `contract-drift`.
 
 ## Нужно только фронту и моку
 
@@ -67,7 +66,8 @@ go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
   `npx --yes @stoplight/prism-cli` скачает его сам.
 - позже — кодоген TypeScript-хуков и Playwright.
 
-Бэкенду Node не нужен: без него не работает только `make dev`.
+Бэкенду Node не нужен: без него не работает `make dev`, а `make gen` перегенерирует
+только Go-типы и честно скажет, что TS-часть пропустил. Гейт всё равно в CI.
 
 ## Фронтовый стек ещё не выбран
 

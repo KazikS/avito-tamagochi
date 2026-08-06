@@ -15,6 +15,7 @@
 backend/
 ├── cmd/main.go        точка входа: только wiring, никакой логики
 ├── internal/
+│   ├── api/           типы из docs/openapi.json, сгенерированные; руками не править
 │   ├── pet/           ─┐
 │   ├── tasks/          │ один пакет на тег OpenAPI,
 │   ├── streak/         │ внутри handler.go / service.go / repo.go
