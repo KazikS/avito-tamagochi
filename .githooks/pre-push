@@ -1,13 +1,49 @@
 #!/usr/bin/env bash
 # Гейт для человека. Claude-хуки связывают только агента; этот — всех,
 # включая того, кто правит руками. Обход при необходимости: git push --no-verify
+#
+# Правило: хук либо проверяет, либо громко говорит, что не проверил. Молча
+# выходить с 0 нельзя — именно так дважды ломался Stop-хук. Раньше здесь было
+# три таких выхода: не нашли origin/main, не нашли каталог, не нашли линтер.
 set -uo pipefail
-root=$(git rev-parse --show-toplevel)
+root=$(git rev-parse --show-toplevel) || exit 1
 
-git diff --name-only origin/main...HEAD 2>/dev/null | grep -q '\.go$' || exit 0
+# База для сравнения. На свежем клоне origin/main может быть не вычитан, и
+# `git diff origin/main...HEAD` падает — раньше stderr съедался и хук молчал.
+base=""
+for ref in origin/main origin/master origin/HEAD; do
+  git rev-parse --verify --quiet "$ref" >/dev/null && { base="$ref"; break; }
+done
+if [ -z "$base" ]; then
+  echo "pre-push: не нашёл origin/main — проверяю весь рабочий каталог." >&2
+  changed="all"
+else
+  changed=$(git diff --name-only "$base...HEAD" -- '*.go')
+  [ -z "$changed" ] && exit 0   # Go-файлы не тронуты, проверять нечего
+fi
 
-echo "pre-push: go build + go test -race + golangci-lint"
-cd "$root/backend" || exit 0
+# Корень модуля не хардкодим: go.mod переезжает в backend/ (docs/DECISIONS.md).
+gomod=$(cd "$root" && go env GOMOD 2>/dev/null)
+if [ -z "$gomod" ] || [ "$gomod" = "/dev/null" ]; then
+  gomod=$(cd "$root" && find . -maxdepth 2 -name go.mod -not -path './.git/*' 2>/dev/null | head -1)
+  [ -n "$gomod" ] && gomod="$root/${gomod#./}"
+fi
+if [ -z "$gomod" ]; then
+  echo "pre-push: go-модуль не найден — НИЧЕГО не проверено. Push остановлен." >&2
+  exit 1
+fi
+modroot=$(dirname "$gomod")
+
+echo "pre-push: go build + go test -race + golangci-lint (модуль: $modroot)"
+cd "$modroot" || { echo "pre-push: не могу зайти в $modroot" >&2; exit 1; }
+
 go build ./... || { echo "pre-push: сборка красная" >&2; exit 1; }
 go test ./... -race || { echo "pre-push: тесты красные" >&2; exit 1; }
-(cd "$root" && golangci-lint run) || { echo "pre-push: линтер красный" >&2; exit 1; }
+
+# golangci-lint запускается из корня модуля, конфиг лежит в корне репозитория.
+if command -v golangci-lint >/dev/null 2>&1; then
+  golangci-lint run --config "$root/.golangci.yaml" \
+    || { echo "pre-push: линтер красный" >&2; exit 1; }
+else
+  echo "pre-push: golangci-lint не установлен — линтер ПРОПУЩЕН (make setup)." >&2
+fi

@@ -33,18 +33,16 @@
 - [ ] `docs/openapi.json` привести к решению `login` + `password` (06.08)
 - [ ] `User` лежит в пакете `pet` — не его домен
 - [ ] первым коммитом: `go.mod` в `backend/`, импорты `tamagochi/backend/...` → `tamagochi/...`
-- [ ] после переезда `go.mod` починить `golangci-lint` в `.githooks/pre-push` и в
-      `make lint` — они запускают его из корня, где модуля больше не будет
+- [ ] после переезда `go.mod` починить `golangci-lint` в `make lint` — он
+      запускается из корня, где модуля больше не будет (`pre-push` уже умеет сам)
+- [ ] после переезда `go.mod` поправить пути в `.golangci.yaml`: `depguard` запрещает
+      `tamagochi/backend/pkg/postgres` и `tamagochi/backend/internal`, а импорты станут
+      `tamagochi/pkg/...` и `tamagochi/internal/...` — правила перестанут срабатывать
+      молча, ровно как сейчас молчат глобы `**/internal/*/service.go`
 - [ ] свести две раскладки к целевой (`docs/ARCHITECTURE.md`)
 - [ ] после этого — убедиться, что `depguard` реально краснеет на нарушении слоя;
       сейчас его правила не матчат ни одного файла
 - [ ] `docker-compose.yaml`: на `main` нет сервиса `postgres` (он только в `feat/auth`) —
       после мержа проверить, что стек поднимается целиком
-- [ ] `backend/build/package/Dockerfile` расплющивает `backend/` в корень образа
-      (`COPY backend/ .`), поэтому импорты `tamagochi/backend/...` в контейнере не
-      резолвятся. Сегодня незаметно: `cmd/main.go` импортирует только `fmt`. Сломается
-      на первом межпакетном импорте — чинить вместе с переездом `go.mod`
-- [ ] `cmd/main.go` — это `Hello World`, HTTP-сервера нет; `make up` поднимает
-      контейнер, который сразу выходит
 - [ ] `POSTGRES_PASSWORD=1234` вынести из `docker-compose.yaml`, путь тома
       `./pgdata/beers_data` переименовать (копипаста из чужого проекта)
