@@ -6,6 +6,4 @@ module tamagochi
 // features, so this is lossless.
 go 1.25.0
 
-require github.com/gofrs/uuid v4.4.0+incompatible
-
-require github.com/google/uuid v1.6.0 // indirect
+require github.com/google/uuid v1.6.0

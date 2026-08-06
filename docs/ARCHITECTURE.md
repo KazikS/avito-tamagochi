@@ -46,6 +46,19 @@ backend/
 раскладку, а в ветках другая. Пока это так, слои держатся на договорённости, а не на
 линтере. Проверить, что правило действительно краснеет, — пункт в `RECONCILIATION.md`.
 
+## Два пути, которые проверяют на ревью
+
+Оставлены здесь потому, что по ним ревьюят: `.claude/commands/review.md` и
+`.github/workflows/claude-review.yml` прямо отсылают к этому файлу за ними.
+
+**Начисление.** `POST /v1/events` → `ingest` → `event_inbox` (idempotency-ключ) →
+`energy_ledger` (с `source`) → состояние питомца (XP, уровень) → push по WS.
+`source` не должен потеряться ни на одном переходе.
+
+**Выдача награды.** `BEGIN` → `SELECT … FOR UPDATE` по пользователю → проверка
+eligibility → `INSERT INTO reward_grants` (есть `UNIQUE(user_id, reward_id)`) →
+`COMMIT`. Без транзакции и без UNIQUE конкурентные claim'ы дают два гранта.
+
 ## Инварианты
 
 1. XP начисляется только вместе с записью в лог действий: idempotency-ключ + проверка

@@ -18,6 +18,6 @@ description: Code-grounded plan before implementation. Use for anything touching
    чужой пакет, или таблицы `event_inbox` / `energy_ledger` / `reward_grants`.
 5. Назови, что осознанно НЕ делаешь в этой задаче.
 6. Если задача трогает незнакомое API библиотеки — сверься с документацией установленной
-   версии, не с памятью. Особенно Chakra, мажоры Gin, sqlc.
+   версии, не с памятью. Особенно Chakra и мажоры Gin.
 
 Выведи план и остановись. Жди подтверждения.
