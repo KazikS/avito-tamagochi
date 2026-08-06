@@ -10,7 +10,7 @@
 | Что | Версия | Зачем | Откуда |
 |---|---|---|---|
 | **Go** | 1.25.x | весь бэкенд; версия закреплена в `go.mod` | <https://go.dev/dl/> |
-| **Docker** + плагин `compose` | любая свежая | `make up`, `make dev`, Postgres для интеграционных тестов | <https://docs.docker.com/get-docker/> |
+| **Docker** + плагин `compose` | любая свежая | `make up`, `make dev`, Postgres для интеграционных тестов | <https://docs.docker.com/get-docker/> или Colima, см. ниже |
 | **golangci-lint** | **2.x** (CI пинит 2.5.0) | `make lint`, `make verify`, гейт в CI | <https://golangci-lint.run/welcome/install/> |
 | **git** | любая свежая | хуки `pre-push` и `commit-msg` | — |
 
@@ -63,7 +63,30 @@ make verify    # build + test -race + vet + lint + govulncheck + тесты ху
 
 **Linux** — проверено, всё работает.
 
-**macOS** — должно работать; специально проверено, что скрипты не используют
+**macOS: Colima вместо Docker Desktop — да, подходит.** Всё, что нужно проекту
+(compose, публикация портов, BuildKit-кэш в Dockerfile), Colima умеет. Две
+детали, на которых теряют время:
+
+```bash
+brew install colima docker docker-compose
+mkdir -p ~/.docker/cli-plugins
+ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" \
+        ~/.docker/cli-plugins/docker-compose
+colima start --cpu 4 --memory 8
+```
+
+1. `colima` — это только рантайм; CLI `docker` и compose ставятся отдельно.
+   Makefile везде вызывает `docker compose` **через пробел** (v2-плагин), а
+   Homebrew кладёт `docker-compose` отдельным бинарём — отсюда симлинк выше.
+   Без него `docker-compose` работает, а `docker compose` нет.
+2. Демон надо поднять (`colima start`) — `make doctor` теперь проверяет это
+   отдельно и скажет прямо, если демон не отвечает.
+
+Держи репозиторий внутри `$HOME`: Colima по умолчанию пробрасывает только его,
+и тома из `docker-compose.yaml` иначе не смонтируются. На Apple Silicon образы
+собираются под arm64 — для локальной разработки это то, что нужно.
+
+**macOS в целом** — должно работать; специально проверено, что скрипты не используют
 GNU-специфичных флагов (`sed -i` без аргумента, `grep -P`, `readlink -f`) и
 возможностей bash 4+ (`declare -A`, `mapfile`, `${x,,}`) — штатный bash 3.2
 их не понимает. Но на самой macOS мы это не гоняли: если что-то отвалится,

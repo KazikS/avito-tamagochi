@@ -57,12 +57,25 @@ else
   bad "golangci-lint" "не найден. Нужен $want_lint: https://golangci-lint.run/welcome/install/"
 fi
 
-# --- Docker: нужен для make up / make dev / интеграционных тестов ---
+# --- Docker: три отдельные проверки, потому что ломается по-разному ---
+# CLI, плагин compose и живой демон — независимы. `docker compose version`
+# отвечает 0 даже при потушенном демоне, так что раньше doctor говорил OK,
+# а `make up` падал. Для Colima это самый частый случай: забыли colima start.
 if command -v docker >/dev/null 2>&1; then
+  ok "docker (CLI)" "$(docker --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+
   if docker compose version >/dev/null 2>&1; then
-    ok "docker + compose" "$(docker --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+    ok "docker compose" "$(docker compose version --short 2>/dev/null || echo 'плагин на месте')"
   else
-    bad "docker compose" "docker есть, но плагина compose нет (нужен для make up)"
+    bad "docker compose" "плагина нет. Makefile использует 'docker compose' (через пробел).
+        На macOS с Colima: brew install docker-compose, затем
+        mkdir -p ~/.docker/cli-plugins && ln -sfn \$(brew --prefix)/opt/docker-compose/bin/docker-compose ~/.docker/cli-plugins/docker-compose"
+  fi
+
+  if docker info >/dev/null 2>&1; then
+    ok "docker (демон)" "отвечает"
+  else
+    bad "docker (демон)" "не отвечает. Docker Desktop не запущен — или, если Colima: colima start"
   fi
 else
   bad "docker" "не найден. Нужен для make up, make dev и Postgres в тестах"
