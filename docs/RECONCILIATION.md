@@ -38,4 +38,7 @@
 - [ ] свести две раскладки к целевой (`docs/ARCHITECTURE.md`)
 - [ ] после этого — убедиться, что `depguard` реально краснеет на нарушении слоя;
       сейчас его правила не матчат ни одного файла
-- [ ] `POSTGRES_PASSWORD=1234` и путь `./pgdata/beers_data` в `docker-compose.yaml`
+- [ ] `docker-compose.yaml`: на `main` нет сервиса `postgres` (он только в `feat/auth`) —
+      после мержа проверить, что стек поднимается целиком
+- [ ] `POSTGRES_PASSWORD=1234` вынести из `docker-compose.yaml`, путь тома
+      `./pgdata/beers_data` переименовать (копипаста из чужого проекта)

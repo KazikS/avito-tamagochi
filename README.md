@@ -7,9 +7,13 @@
 
 ```bash
 make setup     # git-хуки и инструменты. Сделай это первым: без него pre-push не работает
-make up        # postgres + сервер в docker
-make migrate   # накатить миграции (нужен DATABASE_URL)
+make up        # поднять стек в docker
 ```
+
+⚠️ На `main` в `docker-compose.yaml` пока только сервис `server` — Postgres описан
+в ветке `feat/auth` и приедет вместе с ней. До мержа `make up` поднимает приложение
+без базы, а `make migrate` запускать не на чем: каталога `backend/migrations/` здесь
+тоже ещё нет.
 
 Фронту не нужно ждать бэкенд: `make dev` поднимает стек и Prism-мок контракта
 на `:4010`, который отвечает прямо по `docs/openapi.json`.
