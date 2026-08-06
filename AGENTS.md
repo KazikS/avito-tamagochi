@@ -20,10 +20,9 @@ check them, don't trust this file to have been updated:
 - **If `make gen` prints that codegen is not wired**, then types are written by
   hand: copy the spec literally, field for field, and say so in the pull request.
   Once it is wired, generated types win and hand-written ones are a bug.
-- **If `docs/openapi.json` still describes `/auth/*` with `nickname`**, the spec
-  has not caught up with the team's decision of `login` + `password` (06.08);
-  follow the decision, not the spec. Once the spec says `password`, it is ground
-  truth again and this note is moot.
+- **`nickname` in the spec is a display name, not a credential.** Sign-in is
+  `login` + `password` (decided 06.08). `Me.nickname` and the leaderboard use the
+  display name and are unrelated to auth — don't "unify" them.
 
 `make reconcile` answers both mechanically — it reads the repository, not this file.
 

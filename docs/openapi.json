@@ -32,10 +32,12 @@
       "post": {
         "tags": ["auth"], "summary": "Регистрация", "security": [],
         "requestBody": { "required": true, "content": { "application/json": { "schema": {
-          "type": "object", "required": ["nickname", "timezone"],
+          "type": "object", "required": ["login", "password", "timezone"],
           "properties": {
-            "nickname": { "type": "string", "minLength": 2, "maxLength": 24 },
-            "timezone": { "type": "string", "examples": ["Europe/Moscow"] }
+            "login": { "type": "string", "minLength": 2, "maxLength": 64, "description": "Логин для входа (решение команды 06.08)" },
+            "password": { "type": "string", "format": "password", "minLength": 8, "maxLength": 128, "description": "Хранится только хешем; в ответах не возвращается" },
+            "timezone": { "type": "string", "examples": ["Europe/Moscow"] },
+            "nickname": { "type": "string", "minLength": 2, "maxLength": 24, "description": "Отображаемое имя, необязательно: по умолчанию берётся из login. Не учётные данные — см. Me.nickname" }
           } } } } },
         "responses": {
           "200": { "description": "Токены и профиль", "content": { "application/json": { "schema": {
@@ -50,8 +52,10 @@
       "post": {
         "tags": ["auth"], "summary": "Вход", "security": [],
         "requestBody": { "required": true, "content": { "application/json": { "schema": {
-          "type": "object", "required": ["nickname"],
-          "properties": { "nickname": { "type": "string" } } } } } },
+          "type": "object", "required": ["login", "password"],
+          "properties": {
+            "login": { "type": "string" },
+            "password": { "type": "string", "format": "password" } } } } } },
         "responses": {
           "200": { "description": "Токены и профиль", "content": { "application/json": { "schema": {
             "allOf": [ { "$ref": "#/components/schemas/Envelope" },

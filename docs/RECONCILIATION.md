@@ -35,7 +35,8 @@
       заменить на sentinel, gRPC-сервера в проекте нет
 - [ ] пароль пишется в БД открытым текстом, колонка `password` без `NOT NULL` —
       bcrypt перед вставкой + констрейнт
-- [ ] `docs/openapi.json` привести к решению `login` + `password` (06.08)
+- [x] `docs/openapi.json` приведён к решению `login` + `password` (06.08).
+      `nickname` остался как отображаемое имя в `Me` и лидерборде — это не логин
 - [ ] `User` лежит в пакете `pet` — не его домен
 - [x] `go.mod` переехал в `backend/` (сделано и здесь, и в `feat/pet-service`)
 - [x] после переезда: `make lint`, `.golangci.yaml` (пути depguard), CI

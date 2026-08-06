@@ -23,18 +23,27 @@ import (
 	"time"
 )
 
-func main() {
-	addr := os.Getenv("HTTP_ADDR")
-	if addr == "" {
-		addr = ":8080"
-	}
-
+// newMux собирает роутер. Вынесено из main, чтобы его можно было проверить
+// тестом: `go test -race` объявлен гейтом и в Makefile, и в CI, а гейт без
+// единого теста ничего не проверяет — ровно та же ошибка, из-за которой
+// Stop-хук всю свою жизнь молча выходил с нулём.
+func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	return mux
+}
+
+func main() {
+	addr := os.Getenv("HTTP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+
+	mux := newMux()
 
 	srv := &http.Server{
 		Addr:              addr,
