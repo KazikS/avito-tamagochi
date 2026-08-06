@@ -1,5 +1,5 @@
 # Единая точка входа для людей и агентов — не собирайте флаги по памяти.
-.PHONY: help setup up buildup down dev gen migrate seed clock test test-race lint vuln hooks-test verify e2e ci
+.PHONY: help setup up buildup down dev gen migrate seed clock test test-race lint vuln hooks-test hooks-installed reconcile verify e2e ci
 
 help:  ## список команд
 	@grep -E '^[a-zA-Z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
@@ -52,6 +52,15 @@ lint:
 vuln:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+reconcile:  ## состояние docs/RECONCILIATION.md по коду, а не по галочкам
+	bash scripts/reconcile-check.sh
+
+# Предупреждение, а не ошибка: гейт для человека включается одной командой,
+# но забыть её слишком легко, и тогда pre-push просто не существует.
+hooks-installed:
+	@test "$$(git config --get core.hooksPath)" = ".githooks" \
+	  || echo "ВНИМАНИЕ: git-хуки не установлены (pre-push и commit-msg не работают). Запусти: make setup" >&2
+
 hooks-test:  ## тест-таблица PreToolUse-гарда (ловит регрессии в guard.sh)
 	bash .claude/hooks/guard_test.sh .claude/hooks/guard.sh
 
@@ -64,6 +73,7 @@ verify: ## полный гейт: повторяет джоб backend из CI
 	$(MAKE) lint
 	$(MAKE) vuln
 	$(MAKE) hooks-test
+	@$(MAKE) --no-print-directory hooks-installed
 
 e2e:  ## сквозной сценарий в браузере
 	@test -d frontend || { echo "e2e: frontend/ ещё нет"; exit 1; }

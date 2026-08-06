@@ -54,6 +54,7 @@ docs/openapi.json     контракт — ground truth
 - `docs/ARCHITECTURE.md` — раскладка, слои, инварианты.
 - `docs/DECISIONS.md` — что решено, что открыто, что отложено.
 - `docs/RECONCILIATION.md` — что чиним после мержа `feat/auth` и `feat/pet-service`.
+  Актуальное состояние показывает `make reconcile` — он смотрит код, а не галочки.
 
 ## Ограничения на сегодня
 

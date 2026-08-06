@@ -34,6 +34,13 @@ if [ -z "$gomod" ]; then
 fi
 modroot=$(dirname "$gomod")
 
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+case "$branch" in
+  feat/*|fix/*|chore/*|main|HEAD) ;;
+  "") ;;
+  *) echo "pre-push: ветка «$branch» вне соглашения feat/… fix/… chore/… (AGENTS.md). Не блокирую." >&2 ;;
+esac
+
 echo "pre-push: go build + go test -race + golangci-lint (модуль: $modroot)"
 cd "$modroot" || { echo "pre-push: не могу зайти в $modroot" >&2; exit 1; }
 
