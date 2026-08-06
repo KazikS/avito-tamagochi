@@ -4,6 +4,12 @@
 help:  ## список команд
 	@grep -E '^[a-zA-Z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
 
+# Линтер НЕ ставится этим Makefile'ом: `go install` кладёт бинарь в общий
+# $GOPATH/bin и затёр бы версию в других проектах, а `go run` собирает его
+# локальным тулчейном, после чего линтер отказывается работать с модулем,
+# который требует Go новее. Поэтому версия у всех своя, а источник истины —
+# CI: там она запинена. Локальный линтер может находить больше или меньше.
+
 setup:  ## git-хуки + инструменты
 	git config core.hooksPath .githooks
 	cd backend && go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest

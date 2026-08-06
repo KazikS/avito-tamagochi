@@ -48,8 +48,8 @@ backend/
 
 ## Два пути, которые проверяют на ревью
 
-Оставлены здесь потому, что по ним ревьюят: `.claude/commands/review.md` и
-`.github/workflows/claude-review.yml` прямо отсылают к этому файлу за ними.
+Оставлены здесь потому, что по ним ревьюят: `.claude/commands/review.md`
+отсылает к этому файлу за ними.
 
 **Начисление.** `POST /v1/events` → `ingest` → `event_inbox` (idempotency-ключ) →
 `energy_ledger` (с `source`) → состояние питомца (XP, уровень) → push по WS.

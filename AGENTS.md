@@ -14,14 +14,18 @@ stay in Russian, and so do code comments. See "Language" below.
 `docs/openapi.json` is the contract. If you change the shape of a request or a
 response, edit the spec in the same diff.
 
-⚠️ Two temporary exceptions to that rule:
+⚠️ Two exceptions, both written as conditions rather than as claims about today —
+check them, don't trust this file to have been updated:
 
-- **There is no codegen yet.** `oapi-codegen` is only proposed and `make gen`
-  currently does nothing. Until it is wired, types are written by hand — copy the
-  spec literally, field for field, and say so in the pull request.
-- **`/auth/*` is not ground truth right now.** The spec describes signing in with
-  `nickname`; the team decided on `login` + `password` (06.08). Until the spec is
-  updated to match, follow the decision, not the spec.
+- **If `make gen` prints that codegen is not wired**, then types are written by
+  hand: copy the spec literally, field for field, and say so in the pull request.
+  Once it is wired, generated types win and hand-written ones are a bug.
+- **If `docs/openapi.json` still describes `/auth/*` with `nickname`**, the spec
+  has not caught up with the team's decision of `login` + `password` (06.08);
+  follow the decision, not the spec. Once the spec says `password`, it is ground
+  truth again and this note is moot.
+
+`make reconcile` answers both mechanically — it reads the repository, not this file.
 
 ## Never
 

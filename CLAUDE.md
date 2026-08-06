@@ -39,7 +39,9 @@ claims and the idempotency test against a real Postgres. Always write those.
 ## Subagents
 
 Only for genuinely independent, large branches of work — never to double-check
-yourself. `contract-reviewer` is for diffs touching the contract or rewards.
+yourself. There is no project subagent: a reviewer that re-reads your own diff is
+exactly the self-checking this rule forbids, and once codegen lands the compiler
+catches contract drift anyway.
 
 ## Reply format
 

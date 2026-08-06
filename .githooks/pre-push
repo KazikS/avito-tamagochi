@@ -48,9 +48,13 @@ go build ./... || { echo "pre-push: сборка красная" >&2; exit 1; }
 go test ./... -race || { echo "pre-push: тесты красные" >&2; exit 1; }
 
 # golangci-lint запускается из корня модуля, конфиг лежит в корне репозитория.
+# Линтер здесь ПРЕДУПРЕЖДАЕТ, а не блокирует. Версия golangci-lint у каждого
+# своя (официальная страница ставит последнюю), а gosec и staticcheck добавляют
+# правила между выпусками — из-за этого push падал на замечании, которого в CI
+# нет. Гейт по линтеру — CI, там версия запинена. Сборка и тесты ниже блокируют.
 if command -v golangci-lint >/dev/null 2>&1; then
   golangci-lint run --config "$root/.golangci.yaml" \
-    || { echo "pre-push: линтер красный" >&2; exit 1; }
+    || echo "pre-push: линтер красный (локальная версия может быть строже CI) — не блокирую." >&2
 else
-  echo "pre-push: golangci-lint не установлен — линтер ПРОПУЩЕН (make setup)." >&2
+  echo "pre-push: golangci-lint не установлен — линтер пропущен." >&2
 fi
