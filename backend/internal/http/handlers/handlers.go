@@ -1,6 +1,6 @@
 package handlers
 
-type Handlers struct{
+type Handlers struct {
 	Pet PetHandler
+	Ws  WebSocketHandler
 }
-

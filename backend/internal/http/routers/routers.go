@@ -8,8 +8,9 @@ import (
 )
 
 func RegisterRoutes(e *gin.Engine, h handlers.Handlers) {
+	e.GET("/ws", h.Ws.ServeWS)
 	api := e.Group("/api")
-
+	
 	registerPetRouters(api, h.Pet)
 }
 
