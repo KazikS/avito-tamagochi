@@ -30,18 +30,34 @@
 
 Go 1.26 не берём: на нём ломался golangci-lint (`docs/DECISIONS.md`).
 
-## Ставится само
+## Что делает make setup
 
 ```bash
 make setup
 ```
 
-Включает git-хуки (`core.hooksPath`) и доставляет Go-инструменты: `goose`
-(миграции) и `oapi-codegen` (кодоген из контракта, когда его подключат).
-**Без `make setup` у тебя нет `pre-push`** — то есть локальных гейтов нет вообще,
-и об этом никто не предупредит, кроме `make verify` и `make doctor`.
+Ровно одно: включает git-хуки этого клона (`core.hooksPath=.githooks`).
+**Без него у тебя нет `pre-push`**, то есть локальных гейтов нет вообще, и
+скажут об этом только `make verify` и `make doctor`.
 
-`govulncheck` ставить не нужно: `make vuln` запускает его через `go run`, как и CI.
+Больше ничего репозиторий на твою машину не ставит — это твоя машина, а не его.
+`go install` кладёт бинарь в общий `$GOPATH/bin` и затирает версию для всех
+остальных твоих проектов.
+
+## Инструменты по мере надобности
+
+Ставит тот, кому они понадобились, и той версией, которая ему подходит:
+
+```bash
+# goose — нужен только для make migrate
+go install github.com/pressly/goose/v3/cmd/goose@latest
+
+# oapi-codegen — понадобится, когда подключат кодоген из контракта
+go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+```
+
+`govulncheck` ставить не нужно вовсе: `make vuln` запускает его через `go run`,
+как и CI.
 
 ## Нужно только фронту и моку
 

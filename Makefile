@@ -10,10 +10,14 @@ help:  ## список команд
 # который требует Go новее. Поэтому версия у всех своя, а источник истины —
 # CI: там она запинена. Локальный линтер может находить больше или меньше.
 
-setup:  ## git-хуки + инструменты
+# Ставит ровно одно, и только внутри репозитория: core.hooksPath — локальная
+# настройка этого клона. Ничего в общий $GOPATH/bin не кладём: `go install`
+# затирает бинарь для всех остальных проектов на машине, а @latest вдобавок
+# меняется сам по себе. goose и oapi-codegen ставятся тем, кому они нужны, —
+# команды в docs/SETUP.md.
+setup:  ## git-хуки этого клона
 	git config core.hooksPath .githooks
-	cd backend && go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-	cd backend && go install github.com/pressly/goose/v3/cmd/goose@latest
+	@echo "готово: core.hooksPath=.githooks. Инструменты — docs/SETUP.md"
 
 # Без --wait: healthcheck ни у одного сервиса нет, а cmd/main.go пока не сервер,
 # а печать в stdout. С --wait команда падала бы на вышедшем контейнере.

@@ -52,6 +52,13 @@ retelling of the process.
 Correct something you said earlier if it changes a number or a conclusion. Minor
 slips: just fix them silently.
 
+## Slash commands
+
+`.claude/commands/` holds `/plan`, `/implement`, `/verify`, `/review`. Run
+`/verify` before calling anything done. They are a Claude Code convenience and
+exist nowhere else — Cursor and Codex read `AGENTS.md`, which deliberately does
+not depend on them. `make verify` is the part everyone shares.
+
 ## Hooks
 
 `.claude/settings.json` is committed and shared by the team. Personal settings go

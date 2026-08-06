@@ -93,8 +93,9 @@ A target with nothing to do says so itself when you run it. There is deliberatel
 no list of unfinished targets here: such a list goes stale the moment someone
 finishes one, and a target does not.
 
-`[agent]` Workflow: `/plan` → `/implement` → `/verify` → `/review` before a PR.
-Do not skip `/verify`. Several agents on one repository — each in its own git worktree.
+`[agent]` Several agents on one repository — each in its own git worktree.
+Claude Code additionally has project slash commands; they are described in
+`CLAUDE.md` and do not exist in other tools, so nothing here depends on them.
 
 ## Language
 

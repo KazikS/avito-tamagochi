@@ -9,7 +9,7 @@
 
 ```bash
 make doctor    # версии Go, docker, golangci-lint, node + что не хватает
-make setup     # git-хуки и инструменты. Без него pre-push не существует
+make setup     # git-хуки этого клона. Без него pre-push не существует
 make up        # поднять стек в docker
 ```
 
