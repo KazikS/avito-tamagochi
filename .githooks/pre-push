@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Гейт для человека. Claude-хуки связывают только агента; этот — всех,
+# включая того, кто правит руками. Обход при необходимости: git push --no-verify
+set -uo pipefail
+root=$(git rev-parse --show-toplevel)
+
+git diff --name-only origin/main...HEAD 2>/dev/null | grep -q '\.go$' || exit 0
+
+echo "pre-push: go build + go test -race + golangci-lint"
+cd "$root/backend" || exit 0
+go build ./... || { echo "pre-push: сборка красная" >&2; exit 1; }
+go test ./... -race || { echo "pre-push: тесты красные" >&2; exit 1; }
+(cd "$root" && golangci-lint run) || { echo "pre-push: линтер красный" >&2; exit 1; }

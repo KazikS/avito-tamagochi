@@ -1,0 +1,28 @@
+name: Claude review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Ревью только комментирует. contents: write не давать.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    if: '!github.event.pull_request.draft'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # без этого большие диффы обрезаются
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Отревьюй этот PR по критериям из AGENTS.md и docs/ARCHITECTURE.md.
+            Сосредоточься на том, чего не ловят компилятор и golangci-lint:
+            расхождение кода со спекой, claim-путь без транзакции или UNIQUE,
+            потеря source между event_inbox и energy_ledger, доменные решения
+            в handler.go или repo.go, мёртвый код.
+            Кратко. Не выдумывай замечания, если их нет.
