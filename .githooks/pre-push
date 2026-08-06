@@ -34,11 +34,11 @@ if [ -z "$gomod" ]; then
 fi
 modroot=$(dirname "$gomod")
 
-branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-case "$branch" in
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+case "${branch:-}" in
   feat/*|fix/*|chore/*|main|HEAD) ;;
   "") ;;
-  *) echo "pre-push: ветка «$branch» вне соглашения feat/… fix/… chore/… (AGENTS.md). Не блокирую." >&2 ;;
+  *) printf 'pre-push: ветка %s вне соглашения feat/ fix/ chore/ (AGENTS.md). Не блокирую.\n' "${branch:-?}" >&2 ;;
 esac
 
 echo "pre-push: go build + go test -race + golangci-lint (модуль: $modroot)"
