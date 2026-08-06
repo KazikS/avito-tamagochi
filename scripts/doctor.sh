@@ -65,7 +65,7 @@ if command -v golangci-lint >/dev/null 2>&1; then
     bad "golangci-lint" "$have_lint — мажор не тот. .golangci.yaml схемы v2 читает только 2.x"
   fi
 else
-  bad "golangci-lint" "не найден. Нужен $want_lint: https://golangci-lint.run/welcome/install/"
+  bad "golangci-lint" "не найден. Нужен мажор 2 (в CI запинен $want_lint): https://golangci-lint.run/welcome/install/"
 fi
 
 # --- Docker: три отдельные проверки, потому что ломается по-разному ---
