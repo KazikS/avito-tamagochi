@@ -59,6 +59,22 @@ make verify    # build + test -race + vet + lint + govulncheck + тесты ху
 
 `make verify` зелёный — окружение рабочее.
 
+## Платформы
+
+**Linux** — проверено, всё работает.
+
+**macOS** — должно работать; специально проверено, что скрипты не используют
+GNU-специфичных флагов (`sed -i` без аргумента, `grep -P`, `readlink -f`) и
+возможностей bash 4+ (`declare -A`, `mapfile`, `${x,,}`) — штатный bash 3.2
+их не понимает. Но на самой macOS мы это не гоняли: если что-то отвалится,
+скажи, почини одной строкой.
+`make` приезжает с Xcode Command Line Tools: `xcode-select --install`.
+
+**Windows — только через WSL2.** Нативно нет `make`, git-хуки и пути ведут себя
+иначе, docker-compose монтирует тома по-другому. Ставь WSL2 + Ubuntu и работай
+внутри него как в Linux; Docker Desktop умеет отдавать движок в WSL.
+Git Bash сам по себе не хватит — `make` в нём нет.
+
 ## Частые грабли
 
 - **`make verify` падает на `golangci-lint`** с жалобой на неизвестные ключи

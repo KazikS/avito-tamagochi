@@ -12,11 +12,18 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 
 todo=0 done_=0 skipped=0
 
+# Цвет только в терминале — см. scripts/doctor.sh.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_OK=$'\033[32m'; C_BAD=$'\033[31m'; C_OFF=$'\033[0m'
+else
+  C_OK=''; C_BAD=''; C_OFF=''
+fi
+
 # check <статус> <описание>;  статус: done | todo | na
 report() {
   case "$1" in
-    done) printf '  \033[32mDONE\033[0m  %s\n' "$2"; done_=$((done_ + 1)) ;;
-    todo) printf '  \033[31mTODO\033[0m  %s\n' "$2"; todo=$((todo + 1)) ;;
+    done) printf '  %sDONE%s  %s\n' "$C_OK"  "$C_OFF" "$2"; done_=$((done_ + 1)) ;;
+    todo) printf '  %sTODO%s  %s\n' "$C_BAD" "$C_OFF" "$2"; todo=$((todo + 1)) ;;
     na)   printf '  ----  %s (ещё не смержено)\n' "$2"; skipped=$((skipped + 1)) ;;
   esac
 }

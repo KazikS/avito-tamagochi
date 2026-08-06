@@ -11,25 +11,37 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 
 miss=0 warn=0
 
-ok()   { printf '  \033[32mOK\033[0m    %-22s %s\n' "$1" "$2"; }
-bad()  { printf '  \033[31mНЕТ\033[0m   %-22s %s\n' "$1" "$2"; miss=$((miss + 1)); }
-soft() { printf '  \033[33m~\033[0m     %-22s %s\n' "$1" "$2"; warn=$((warn + 1)); }
+# Цвет только в терминале. Иначе escape-коды текут в лог CI, в `| cat`,
+# в вывод make и в консоли Windows, где ANSI может не разбираться вовсе.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_OK=$'\033[32m'; C_BAD=$'\033[31m'; C_WARN=$'\033[33m'; C_OFF=$'\033[0m'
+else
+  C_OK=''; C_BAD=''; C_WARN=''; C_OFF=''
+fi
+
+ok()   { printf '  %sOK%s    %-22s %s\n'  "$C_OK"   "$C_OFF" "$1" "$2"; }
+bad()  { printf '  %sНЕТ%s   %-22s %s\n' "$C_BAD"  "$C_OFF" "$1" "$2"; miss=$((miss + 1)); }
+soft() { printf '  %s~%s     %-22s %s\n' "$C_WARN" "$C_OFF" "$1" "$2"; warn=$((warn + 1)); }
 
 echo "Проверка окружения"
 echo
 
 # --- Go: версия из go.mod ---
+# major.minor режем через cut, а не через ${v%.*}: в go.mod патч может
+# отсутствовать («go 1.26»), и тогда ${v%.*} даёт «1» и ложное расхождение.
+minor() { printf '%s' "$1" | cut -d. -f1,2; }
+
 want_go=$(awk '/^go /{print $2}' go.mod)
+want_go_mm=$(minor "$want_go")
 if command -v go >/dev/null 2>&1; then
   have_go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')
-  # сравниваем только major.minor: патч не важен
-  if [ "${have_go%.*}" = "${want_go%.*}" ]; then
-    ok "go" "$have_go (go.mod требует ${want_go%.*}.x)"
+  if [ "$(minor "$have_go")" = "$want_go_mm" ]; then
+    ok "go" "$have_go (go.mod требует $want_go_mm.x)"
   else
-    soft "go" "$have_go, а go.mod требует ${want_go%.*}.x — соберётся, но CI гоняет ${want_go%.*}"
+    soft "go" "$have_go, а go.mod требует $want_go_mm.x — соберётся, но CI гоняет $want_go_mm"
   fi
 else
-  bad "go" "не найден. https://go.dev/dl/ — нужна ветка ${want_go%.*}"
+  bad "go" "не найден. https://go.dev/dl/ — нужна ветка $want_go_mm"
 fi
 
 # --- golangci-lint: версия из CI, схема конфига v2 ---
