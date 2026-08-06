@@ -51,10 +51,17 @@ if printf '%s' "$cmd" \
 команда) — положи его в файл: git commit -F <файл>."
 fi
 
+# Опять регулярка вместо глоба: флаги пишут в разном порядке, и шаблон
+# *"git reset --hard"* не ловил `git reset -q --hard` — проверено, проходило.
+if printf '%s' "$cmd" | grep -qE 'git\b[^;&|]*[[:space:]]push\b[^;&|]*(--force|[[:space:]]-f([[:space:]]|$))'; then
+  deny "force-push. Репозиторий общий, четыре человека."
+fi
+if printf '%s' "$cmd" | grep -qE 'git\b[^;&|]*[[:space:]]reset\b[^;&|]*--hard'; then
+  deny "снос незакоммиченных изменений — возможно, чужих."
+fi
+
 case "$cmd" in
-  *"git push --force"*|*"git push -f"*|*"--force-with-lease"*)
-                                  deny "force-push. Репозиторий общий, четыре человека." ;;
-  *"git reset --hard"*|*"git checkout ."*|*"git clean -fd"*)
+  *"git checkout ."*|*"git clean -fd"*)
                                   deny "снос незакоммиченных изменений — возможно, чужих." ;;
   *"git worktree remove"*)        deny "удаление worktree — возможно, чужого. Сделай вручную." ;;
 esac

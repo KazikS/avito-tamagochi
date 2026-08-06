@@ -47,7 +47,10 @@ run 'rm -rf $HOME' 2
 run 'rm -rf ${HOME}/' 2
 run 'git push --force origin main' 2
 run 'git push -f' 2
+run 'git push --force-with-lease origin main' 2
 run 'git reset --hard HEAD~1' 2
+run 'git reset -q --hard HEAD~1' 2
+run 'git -c core.pager=cat reset --hard HEAD' 2
 run 'git clean -fd' 2
 run "psql -c 'DROP TABLE users;'" 2
 run 'psql -c "TRUNCATE energy_ledger"' 2
@@ -62,6 +65,9 @@ run 'go build ./...' 0
 run 'make verify' 0
 run 'git push -u origin chore/agentic-scaffolding' 0
 run 'git log --oneline -5' 0
+run 'git reset HEAD~1' 0
+run 'git push origin main' 0
+run 'git fetch origin main' 0
 
 echo
 if [ "$fails" -eq 0 ]; then
