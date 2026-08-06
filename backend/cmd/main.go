@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -41,14 +42,24 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	// Слушателя открываем сами, до старта сервера. Две причины: кривой HTTP_ADDR
+	// падает сразу и понятно, а не внутри горутины; и в лог идёт адрес, который
+	// вернула ОС (`ln.Addr()`), а не строка из переменной окружения. Логировать
+	// сырое значение переменной — это G706 (log injection) у gosec: в переменную
+	// можно положить перевод строки и подделать записи в логе.
+	ln, lnErr := net.Listen("tcp", addr)
+	if lnErr != nil {
+		log.Fatalf("не могу слушать %s: %v", srv.Addr, lnErr)
+	}
+
 	// Останов по сигналу: без него контейнер убивают по таймауту на каждом
 	// docker compose down, и это заметно замедляет цикл разработки.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	go func() {
-		log.Printf("сервер слушает %s", addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf("сервер слушает %v", ln.Addr())
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("сервер остановлен с ошибкой: %v", err)
 			stop()
 		}

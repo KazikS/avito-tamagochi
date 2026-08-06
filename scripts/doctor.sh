@@ -54,8 +54,13 @@ fi
 want_lint=$(grep -oE 'version: v[0-9]+\.[0-9]+\.[0-9]+' .github/workflows/ci.yml | head -1 | sed 's/version: v//')
 if command -v golangci-lint >/dev/null 2>&1; then
   have_lint=$(golangci-lint --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  if [ "${have_lint%%.*}" = "${want_lint%%.*}" ]; then
-    ok "golangci-lint" "$have_lint (CI пинит $want_lint)"
+  if [ "$have_lint" = "$want_lint" ]; then
+    ok "golangci-lint" "$have_lint (совпадает с пином CI)"
+  elif [ "${have_lint%%.*}" = "${want_lint%%.*}" ]; then
+    # Мажор тот же — конфиг прочитается, но набор правил у gosec/staticcheck
+    # между минорными версиями меняется. Отсюда «локально красный, в CI
+    # зелёный» и наоборот: у линтера появляются новые проверки.
+    soft "golangci-lint" "$have_lint, а CI гоняет $want_lint — результаты могут расходиться"
   else
     bad "golangci-lint" "$have_lint — мажор не тот. .golangci.yaml схемы v2 читает только 2.x"
   fi
