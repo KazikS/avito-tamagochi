@@ -89,9 +89,9 @@ what each one checks: `README.md`. Minimum before a PR: `make verify`.
 Useful: `make doctor` (is the local toolchain complete), `make reconcile` (what is
 still left over from merging the feature branches, checked against the code).
 
-Targets that currently have nothing to do (`seed`, `clock`, `e2e`, the codegen part
-of `gen`) say so themselves when run — there is no list of "what's broken" in the
-docs on purpose, because such a list goes stale silently and a target does not.
+A target with nothing to do says so itself when you run it. There is deliberately
+no list of unfinished targets here: such a list goes stale the moment someone
+finishes one, and a target does not.
 
 `[agent]` Workflow: `/plan` → `/implement` → `/verify` → `/review` before a PR.
 Do not skip `/verify`. Several agents on one repository — each in its own git worktree.
