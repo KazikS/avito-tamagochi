@@ -59,7 +59,7 @@ check them, don't trust this file to have been updated:
 - `[agent]` Same thing, but in the first line of your reply, not a footnote at the end.
 - `[agent]` Show command output, not a summary of it. "passed" is not a result.
 - `[agent]` For an unfamiliar library API, check the docs of the installed version
-  instead of writing from memory. Gin majors, coder/websocket and especially
+  instead of writing from memory. Gin majors, gorilla/websocket and especially
   Chakra differ a lot between versions.
 
 ## Stop questions — the team decides, not the agent
