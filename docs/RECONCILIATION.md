@@ -37,13 +37,21 @@
       bcrypt перед вставкой + констрейнт
 - [ ] `docs/openapi.json` привести к решению `login` + `password` (06.08)
 - [ ] `User` лежит в пакете `pet` — не его домен
-- [ ] первым коммитом: `go.mod` в `backend/`, импорты `tamagochi/backend/...` → `tamagochi/...`
-- [ ] после переезда `go.mod` починить `golangci-lint` в `make lint` — он
-      запускается из корня, где модуля больше не будет (`pre-push` уже умеет сам)
-- [ ] после переезда `go.mod` поправить пути в `.golangci.yaml`: `depguard` запрещает
-      `tamagochi/backend/pkg/postgres` и `tamagochi/backend/internal`, а импорты станут
-      `tamagochi/pkg/...` и `tamagochi/internal/...` — правила перестанут срабатывать
-      молча, ровно как сейчас молчат глобы `**/internal/*/service.go`
+- [x] `go.mod` переехал в `backend/` (сделано и здесь, и в `feat/pet-service`)
+- [x] после переезда: `make lint`, `.golangci.yaml` (пути depguard), CI
+      (`cache-dependency-path`), Dockerfile, `doctor.sh`, `reconcile-check.sh`
+- [ ] **`feat/pet-service` не собирается**: там `go.mod` переехал, а импорты остались
+      `tamagochi/backend/...`. Чинится заменой на `tamagochi/...` в 4 файлах
+- [ ] **две миграции создают таблицу `users` по-разному** и вторая упадёт
+      («relation already exists»): `feat/auth` — `id SERIAL, login, password`,
+      `feat/pet-service` — `id UUID, username, password_hash`. Нужна одна схема.
+      Заодно: `repository/user.go` пишет `INSERT INTO users (login, password)`,
+      то есть код и схема `feat/pet-service` расходятся по именам колонок
+- [ ] `internal/websocket`: `RemoveClient` читает карту вне блокировки и делает
+      `conn.Close()` по nil, если ключа нет — гонка плюс паника. Плюс ключ — это
+      request ID (`RequestIDKey` и `requestIDKey` — одно значение), а не user ID
+- [ ] gorilla требует, чтобы в соединение писала одна горутина: менеджеру нужен
+      мьютекс на запись до того, как появится пуш состояния
 - [ ] свести две раскладки к целевой (`docs/ARCHITECTURE.md`)
 - [ ] после этого — убедиться, что `depguard` реально краснеет на нарушении слоя;
       сейчас его правила не матчат ни одного файла

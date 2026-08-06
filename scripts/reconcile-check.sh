@@ -102,7 +102,7 @@ fi
 
 # --- то, что приезжает с feat/pet-service ---
 if has backend/internal/usecase/pet.go; then
-  if go build ./... >/dev/null 2>&1; then
+  if (cd backend && go build ./... >/dev/null 2>&1); then
     report done "дерево собирается (у GetPetState есть тело)"
   else
     report todo "сборка красная — вероятно, у GetPetState нет тела функции"
@@ -121,6 +121,19 @@ if has "$rt"; then
     || report done "роут питомца объявлен с параметром пути"
 else
   report na "роуты питомца (приезжают с feat/pet-service)"
+fi
+
+# --- коллизия миграций: обе ветки создают таблицу users по-разному ---
+auth_mig=$(ls backend/migrations/*add_users_table.sql 2>/dev/null | head -1)
+pet_mig=$(ls backend/migrations/*init_pet_tables.sql 2>/dev/null | grep -v 00001 | head -1)
+if [ -n "$auth_mig" ] && [ -n "$pet_mig" ]; then
+  if grepq 'CREATE TABLE users' "$pet_mig" && grepq 'CREATE TABLE IF NOT EXISTS users' "$auth_mig"; then
+    report todo "две миграции создают users по-разному: вторая упадёт «relation already exists». Нужна одна схема"
+  else
+    report done "таблица users определена в одном месте"
+  fi
+else
+  report na "коллизия миграций users (обе ветки ещё не смержены)"
 fi
 
 # --- контракт и инфраструктура ---

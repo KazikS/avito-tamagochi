@@ -71,7 +71,7 @@ linters:
               desc: "Gin только в handler.go"
             - pkg: github.com/jackc/pgx
               desc: "БД только в repo.go, через интерфейс"
-            - pkg: tamagochi/backend/pkg/postgres
+            - pkg: tamagochi/pkg/postgres
               desc: "БД только в repo.go"
 
         handler-layer:
@@ -81,7 +81,7 @@ linters:
           deny:
             - pkg: github.com/jackc/pgx
               desc: "handler не ходит в БД — вызывай service, тот вызывает repo"
-            - pkg: tamagochi/backend/pkg/postgres
+            - pkg: tamagochi/pkg/postgres
               desc: "handler не ходит в БД напрямую"
 
         # backend/pkg — общая платформа (postgres, позже ws/ingest), ниже фич.
@@ -92,7 +92,7 @@ linters:
             - "**/backend/pkg/**"
             - "!$test"
           deny:
-            - pkg: tamagochi/backend/internal
+            - pkg: tamagochi/internal
               desc: "pkg/ ниже фич и не импортирует internal/**"
 
     # --- Время: параметром, не из часов внутри домена ---

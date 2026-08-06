@@ -44,9 +44,11 @@ test:  ## быстрый прогон (то же, что Stop-хук)
 test-race:
 	cd backend && go test ./... -race
 
+# go.mod живёт в backend/, поэтому линтер запускается оттуда, а конфиг —
+# из корня репозитория (его расположение — требование кейса).
 lint:
 	cd backend && go vet ./...
-	golangci-lint run
+	cd backend && golangci-lint run --config ../.golangci.yaml
 
 # Через go run, как в CI: verify не должен требовать предварительного make setup.
 vuln:

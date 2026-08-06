@@ -31,10 +31,16 @@ echo
 # отсутствовать («go 1.26»), и тогда ${v%.*} даёт «1» и ложное расхождение.
 minor() { printf '%s' "$1" | cut -d. -f1,2; }
 
-want_go=$(awk '/^go /{print $2}' go.mod)
+# go.mod переехал в backend/; ищем его, а не предполагаем путь.
+gomod=$(find . -maxdepth 2 -name go.mod -not -path './.git/*' 2>/dev/null | head -1)
+if [ -z "$gomod" ]; then
+  echo "  go.mod не найден — проверять нечего." >&2
+  exit 1
+fi
+want_go=$(awk '/^go /{print $2}' "$gomod")
 want_go_mm=$(minor "$want_go")
 if command -v go >/dev/null 2>&1; then
-  have_go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')
+  have_go=$(cd "$(dirname "$gomod")" && go env GOVERSION 2>/dev/null | sed 's/^go//')
   if [ "$(minor "$have_go")" = "$want_go_mm" ]; then
     ok "go" "$have_go (go.mod требует $want_go_mm.x)"
   else

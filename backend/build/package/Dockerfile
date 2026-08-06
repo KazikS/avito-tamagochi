@@ -4,20 +4,17 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Раскладку сохраняем: модуль называется tamagochi, а пакеты лежат под
-# tamagochi/backend/..., поэтому backend/ должен остаться подкаталогом.
-# Было `COPY backend/ .`, из-за чего каталог расплющивался в корень и импорты
-# tamagochi/backend/... не резолвились. Сегодня это не всплывало только потому,
-# что cmd/main.go не импортировал ничего своего.
-COPY backend/ ./backend/
+# go.mod лежит в backend/, значит корень модуля — это backend/, и его
+# содержимое кладётся в корень образа: пакеты называются tamagochi/internal/...
+COPY backend/ ./
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o /out/server ./backend/cmd
+    go build -o /out/server ./cmd
 
 FROM alpine:latest
 
