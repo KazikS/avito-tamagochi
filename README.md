@@ -22,7 +22,8 @@ export TEST_DATABASE_URL=postgres://tamagochi:tamagochi@localhost:5432/tamagochi
 
 Пользователя, пароль и базу можно переопределить через `POSTGRES_USER`,
 `POSTGRES_PASSWORD`, `POSTGRES_DB` — в compose у них есть значения по умолчанию
-для локальной разработки. Сами миграции приезжают с ветками фич.
+для локальной разработки. Миграции лежат в `backend/migrations/` и накатываются
+`make migrate`.
 
 Фронту не нужно ждать бэкенд: `make dev` поднимает стек и Prism-мок контракта
 на `:4010`, который отвечает прямо по `docs/openapi.json`.

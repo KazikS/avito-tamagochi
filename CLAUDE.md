@@ -54,10 +54,13 @@ slips: just fix them silently.
 
 ## Slash commands
 
-`.claude/commands/` holds `/plan`, `/implement`, `/verify`, `/review`. Run
-`/verify` before calling anything done. They are a Claude Code convenience and
-exist nowhere else — Cursor and Codex read `AGENTS.md`, which deliberately does
-not depend on them. `make verify` is the part everyone shares.
+`.claude/commands/` holds the loop: `/plan` → `/implement` → `/verify` → `/review`
+before a PR. They are a convenience, not a ritual — plain conversation and your
+own prompts are fine, and nothing in this project depends on them being used.
+The one worth reaching for is `/verify`, because "done" without it is a guess.
+
+They exist only in Claude Code. Cursor and Codex read `AGENTS.md`, which
+deliberately depends on none of this; `make verify` is what everyone shares.
 
 ## Hooks
 
