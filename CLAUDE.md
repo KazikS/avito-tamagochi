@@ -2,50 +2,59 @@
 
 @AGENTS.md
 
-Всё общее — в `AGENTS.md` (его читают Cursor, Codex, Copilot и остальные).
-Ниже — поведенческие правила для Claude Code, адаптированные из публичных
-guidelines Andrej Karpathy, с одной сознательной поправкой под хакатон (см. ниже).
+Everything shared with other tools lives in `AGENTS.md` (Cursor, Codex and the
+rest read that one). Below are behavioural rules for Claude Code specifically,
+adapted from Andrej Karpathy's published guidelines with one deliberate change
+for hackathon pace.
 
-## Как думать перед тем, как писать код
+Both files are English because nothing but an agent ever reads them. Docs written
+for the team, and all code comments, stay in Russian — see "Language" in `AGENTS.md`.
 
-- **Не додумывай, не прячь непонимание.** Несколько трактовок задачи — назови
-  их, не выбирай молча. Неясно — остановись, спроси.
-- **Минимальный код.** Никаких абстракций и «гибкости», которые не просили.
-  Написал 200 строк там, где хватит 50, — перепиши короче.
-- **Правка по задаче, не хирургия любой ценой.** Карпати требует трогать
-  только строки, которые прямо тянутся к задаче — на 7-дневном хакатоне это
-  местами слишком строго: если по пути мешает то, что нужно починить, чтобы
-  задачу вообще закончить (или очевидный соседний баг в том же файле), тронь
-  и скажи об этом первой строкой ответа. Не трогай молча и не переписывай
-  стиль/форматирование ради вкуса — это разные вещи.
-- **Определи критерий готовности до начала.** «Почини баг» → «напиши тест,
-  который его воспроизводит, затем сделай зелёным». Слабый критерий требует
-  постоянных уточнений; сильный — позволяет доработать самостоятельно.
+## Think before writing code
 
-## Проверка и самопроверка
+- **Don't fill in gaps silently, don't hide confusion.** If a task has several
+  readings, name them instead of picking one quietly. If something is unclear,
+  stop and ask.
+- **Minimal code.** No abstractions and no "flexibility" nobody asked for. If you
+  wrote 200 lines where 50 would do, rewrite it shorter.
+- **Scoped edits, not surgery at any cost.** Karpathy asks you to touch only lines
+  that trace directly to the task. On a 7-day hackathon that is sometimes too
+  strict: if something in the way must be fixed for the task to be finishable at
+  all — or it's an obvious neighbouring bug in the same file — fix it and say so in
+  the first line of your reply. Fixing silently, and rewriting style or formatting
+  to taste, are different things and both stay forbidden.
+- **Define done before starting.** "Fix the bug" → "write a test that reproduces
+  it, then make it green". A weak criterion needs constant clarification; a strong
+  one lets you work to completion on your own.
 
-Не добавляй отдельные проходы верификации и сабагентов-верификаторов поверх
-того, что делаешь сам. Реальные гейты — `/verify`, Stop-хук и CI; всё
-остальное тратит токены без выигрыша.
+## Verification
 
-Исключение — не самопроверка, а контроль корректности: тест на гонку для
-claim'а и тест идемпотентности против настоящего Postgres. Их писать всегда.
+Don't add separate verification passes or verifier subagents on top of what you
+already do. The real gates are `/verify`, the Stop hook and CI; anything else
+burns tokens for nothing.
 
-## Сабагенты
+The exception is not self-checking but correctness: the race test for reward
+claims and the idempotency test against a real Postgres. Always write those.
 
-Только для по-настоящему независимых крупных веток работы, не для перепроверки
-себя. `contract-reviewer` — на диффы, трогающие контракт или награды.
+## Subagents
 
-## Формат ответов
+Only for genuinely independent, large branches of work — never to double-check
+yourself. `contract-reviewer` is for diffs touching the contract or rewards.
 
-Одна строка о том, что собираешься делать, перед блоком работы. Дальше —
-обновление, когда нашёл что-то или сменил направление. В конце — вывод, а не
-пересказ процесса.
+## Reply format
 
-Поправляй сказанное раньше, если это меняет число или вывод. Мелкие оговорки —
-просто исправляй молча.
+One line about what you're about to do, before the block of work. Then an update
+when you find something or change direction. A conclusion at the end, not a
+retelling of the process.
 
-## Хуки
+Correct something you said earlier if it changes a number or a conclusion. Minor
+slips: just fix them silently.
 
-`.claude/settings.json` закоммичен и общий на команду. Личные настройки —
-в `.claude/settings.local.json` (в `.gitignore`).
+## Hooks
+
+`.claude/settings.json` is committed and shared by the team. Personal settings go
+in `.claude/settings.local.json` (gitignored).
+
+Two hooks have already shipped broken and silently passed everything — treat any
+hook you write as broken until you have watched it fail. `.claude/hooks/guard_test.sh`
+exists for exactly that reason and runs inside `make verify`.

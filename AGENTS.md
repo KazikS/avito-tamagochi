@@ -1,89 +1,110 @@
-# Авито Тамагочи
+# Avito Tamagochi
 
-Go-бэкенд + React-фронт. Хакатон, ~7 дней, четыре человека, один репозиторий.
-Правила разработки: их читают и люди, и Claude/Cursor/Codex. Как запустить — `README.md`.
-`[агент]` — строки только для ИИ-ассистентов, человек их пропускает.
+Go backend + React frontend. Hackathon, ~7 days, four people, one repository.
+
+**This file is in English on purpose: it is loaded into every agent session by
+Claude, Cursor and Codex, and most of its vocabulary is English anyway.**
+Docs written for people to read — `README.md`, `docs/SETUP.md`, `docs/DECISIONS.md` —
+stay in Russian, and so do code comments. See "Language" below.
+
+`[agent]` marks lines that only apply to AI assistants; a human skips those.
 
 ## Ground truth
 
-`docs/openapi.json` — контракт. Меняешь форму запроса/ответа — правь спеку в том же
-диффе.
+`docs/openapi.json` is the contract. If you change the shape of a request or a
+response, edit the spec in the same diff.
 
-⚠️ Две поправки к этому правилу, обе временные:
+⚠️ Two temporary exceptions to that rule:
 
-- Кодогена ещё нет (oapi-codegen только предложен, `make gen` сегодня ничего не делает).
-  Пока типы приходится писать руками — держи их дословно по спеке и скажи об этом в PR.
-- Спека описывает вход по `nickname`, а команда выбрала `login` + `password`
-  (06.08). До правки спеки `/auth/*` не является ground truth.
+- **There is no codegen yet.** `oapi-codegen` is only proposed and `make gen`
+  currently does nothing. Until it is wired, types are written by hand — copy the
+  spec literally, field for field, and say so in the pull request.
+- **`/auth/*` is not ground truth right now.** The spec describes signing in with
+  `nickname`; the team decided on `login` + `password` (06.08). Until the spec is
+  updated to match, follow the decision, not the spec.
 
-## Никогда
+## Never
 
-- Не начисляй XP за действие без записи в лог действий с idempotency-ключом и проверкой
-  суточного капа. Уход начисляет XP (решено 06.08) — значит от накрутки защищает лог
-  и кап, а не запрет самого действия.
-- Не выдавай награду строкой-кодом, которую можно переслать.
-- Не теряй `source: gamified|organic` между `event_inbox` и `energy_ledger`.
-- Не обнуляй прогресс пользователя миграцией.
-- Не рисуй знак Авито (4 круга) как персонажа.
-- Не вызывай `time.Now()` внутри доменной логики — передавай время параметром.
-- Не создавай интерфейс, пока нет второй реальной реализации (исключение —
-  `repo.go` за интерфейсом: вторая реализация это фейк в тесте домена).
-- Не пиши в `internal/<tag>/service.go` код, зависящий от `net/http` или Gin.
-- Не ходи в БД из `handler.go` или `service.go` — только через `repo.go`.
+- Never award XP for an action without writing an entry to the action log with an
+  idempotency key and a daily-cap check. Care actions *do* grant XP (decided
+  06.08), so what protects against farming is the log and the cap — not refusing
+  the action.
+- Never hand out a reward as a code string that can be forwarded to someone else.
+- Never lose `source: gamified|organic` between `event_inbox` and `energy_ledger`.
+- Never reset a user's progress in a migration.
+- Never draw the Avito mark (the four circles) as the pet character.
+- Never call `time.Now()` inside domain logic — pass time in as a parameter.
+- Never introduce an interface before a second real implementation exists. The one
+  exception is `repo.go` behind an interface: the second implementation is the
+  fake used in domain tests.
+- Never let `internal/<tag>/service.go` depend on `net/http` or Gin.
+- Never reach the database from `handler.go` or `service.go` — only through `repo.go`.
 
-## Всегда
+## Always
 
-- Ветки `feat/<область>`, `fix/<область>`, `chore/<область>`; PR маленькие,
-  `main` всегда рабочий. Формат ветки и Conventional Commits подсказывают
-  `pre-push` и `commit-msg` — они предупреждают, но не блокируют, так что
-  соблюдение всё равно на тебе.
-- Conventional Commits (`feat(rewards): ...`), со своего аккаунта.
-- Комментарии в коде и доккоменты — по-русски, как уже принято в `backend/`.
-- Трогаешь чужой пакет, `docs/openapi.json` или таблицы `event_inbox` / `energy_ledger` /
-  `reward_grants` — скажи об этом явно в описании PR.
-- Заметил проблему рядом с задачей — назови её, не чини молча (кроме мелочи, без которой
-  саму задачу не закончить — тогда чини и скажи).
-- `[агент]` Про то же самое — первой строкой ответа, а не примечанием в конце.
-- `[агент]` Показывай вывод команд, а не пересказ: «passed» — не результат.
-- `[агент]` Незнакомое API библиотеки — сверься с документацией установленной версии,
-  не пиши по памяти. Мажоры Gin, coder/websocket и особенно Chakra расходятся сильно.
+- Branches `feat/<area>`, `fix/<area>`, `chore/<area>`; small pull requests; `main`
+  always works. `pre-push` and `commit-msg` hint at the branch format and
+  Conventional Commits, but they only warn — following it is still on you.
+- Conventional Commits (`feat(rewards): ...`), from your own account.
+- **Code comments and doc comments are written in Russian**, which is what the
+  team already does in `backend/`. This file being English does not change that.
+- If you touch someone else's package, `docs/openapi.json`, or the `event_inbox` /
+  `energy_ledger` / `reward_grants` tables, say so explicitly in the PR description.
+- Spot a problem next to your task — name it, don't silently fix it. The exception
+  is something small you must fix to finish the task at all: then fix it and say so.
+- `[agent]` Same thing, but in the first line of your reply, not a footnote at the end.
+- `[agent]` Show command output, not a summary of it. "passed" is not a result.
+- `[agent]` For an unfamiliar library API, check the docs of the installed version
+  instead of writing from memory. Gin majors, coder/websocket and especially
+  Chakra differ a lot between versions.
 
-## Стоп-вопросы — решает команда, не агент
+## Stop questions — the team decides, not the agent
 
-Наткнулся на любую из этих тем — остановись и спроси. Детали — `docs/DECISIONS.md`
-→ «Открытое».
+Hit any of these and stop and ask. Details in `docs/DECISIONS.md` → «Открытое».
 
-**Entitlement наград** (можно ли отдавать `promoCode` строкой) · **кривая уровней** ·
-**концепт питомца** · **Redis** (по умолчанию нет) · **Chakra v2 или v3**.
+**Reward entitlement** (may a `promoCode` be handed out as a string) · **the level
+curve** · **the pet concept** · **Redis** (default is no) · **Chakra v2 or v3**.
 
-Энергия/прогресс и модель авторизации больше не стоп-вопросы — решены 06.08.
-Всё остальное решай сам, не спрашивая.
+Energy/progress and the auth model are no longer stop questions — both decided
+06.08. Everything else: decide it yourself, don't ask.
 
 ## Layout
 
-Пакет на тег OpenAPI, внутри три файла: `handler.go` (HTTP), `service.go` (домен,
-чистые функции, время параметром), `repo.go` (единственное место с SQL). Общая
-инфраструктура — `backend/pkg/`, ниже всех фич.
+One package per OpenAPI tag, three files inside: `handler.go` (HTTP),
+`service.go` (domain, pure functions, time as a parameter), `repo.go` (the only
+place with SQL). Shared infrastructure lives in `backend/pkg/`, below all features.
 
-Полное дерево, таблица «кому что можно» и инварианты — `docs/ARCHITECTURE.md`.
-Границы пакетов = границы контракта.
+Full tree, the "who may import what" table and the invariants are in
+`docs/ARCHITECTURE.md`. Package boundaries are contract boundaries.
 
-## Команды
+## Commands
 
-`make` — единственная точка входа, флаги по памяти не собирай. Полный список и что
-чем проверяется — `README.md`. Минимум: `make verify` перед PR.
+`make` is the only entry point — don't assemble flags from memory. Full list and
+what each one checks: `README.md`. Minimum before a PR: `make verify`.
 
-Цели, которым пока нечего делать (`seed`, `clock`, `e2e`, кодоген в `gen`), говорят
-об этом сами при запуске — отдельного списка в документации не держим, он бы устарел
-молча.
+Useful: `make doctor` (is the local toolchain complete), `make reconcile` (what is
+still left over from merging the feature branches, checked against the code).
 
-`[агент]` Воркфлоу: `/plan` → `/implement` → `/verify` → `/review` перед PR.
-`/verify` не пропускать. Несколько агентов на репозитории — каждый в своём git worktree.
+Targets that currently have nothing to do (`seed`, `clock`, `e2e`, the codegen part
+of `gen`) say so themselves when run — there is no list of "what's broken" in the
+docs on purpose, because such a list goes stale silently and a target does not.
 
-## Остальные файлы
+`[agent]` Workflow: `/plan` → `/implement` → `/verify` → `/review` before a PR.
+Do not skip `/verify`. Several agents on one repository — each in its own git worktree.
 
-Не грузятся автоматически — читай, когда задача их касается:
-`README.md` (запуск и проверка) · `docs/DECISIONS.md` (что решено, что открыто) ·
-`docs/ARCHITECTURE.md` (раскладка, слои, инварианты) ·
-`docs/RECONCILIATION.md` (что чиним после мержа веток; файл исчезнет, когда починим) ·
-`docs/AI-USAGE.md` (для защиты, собирается в день 6).
+## Language
+
+- **English:** this file and `CLAUDE.md` — they exist to be loaded into agent context.
+- **Russian:** `README.md`, `docs/SETUP.md`, `docs/DECISIONS.md`,
+  `docs/ARCHITECTURE.md`, `docs/RECONCILIATION.md`, `docs/AI-USAGE.md`, all code
+  comments, commit messages, PR descriptions. The team is Russian-speaking and the
+  defense is in Russian; `docs/DECISIONS.md` in particular doubles as defense notes.
+
+## Other files
+
+Not loaded automatically — read them when the task touches them:
+`README.md` (run and verify) · `docs/SETUP.md` (what to install) ·
+`docs/DECISIONS.md` (decided, open, deferred) ·
+`docs/ARCHITECTURE.md` (layout, layers, invariants) ·
+`docs/RECONCILIATION.md` (post-merge fixes; the file disappears when done) ·
+`docs/AI-USAGE.md` (for the defense, assembled on day 6).

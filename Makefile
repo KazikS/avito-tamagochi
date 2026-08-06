@@ -1,5 +1,5 @@
 # Единая точка входа для людей и агентов — не собирайте флаги по памяти.
-.PHONY: help setup up buildup down dev gen migrate seed clock test test-race lint vuln hooks-test hooks-installed reconcile verify e2e ci
+.PHONY: help setup up buildup down dev gen migrate seed clock test test-race lint vuln hooks-test hooks-installed reconcile doctor verify e2e ci
 
 help:  ## список команд
 	@grep -E '^[a-zA-Z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
@@ -51,6 +51,9 @@ lint:
 # Через go run, как в CI: verify не должен требовать предварительного make setup.
 vuln:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+doctor:  ## что нужно поставить локально и чего не хватает
+	bash scripts/doctor.sh
 
 reconcile:  ## состояние docs/RECONCILIATION.md по коду, а не по галочкам
 	bash scripts/reconcile-check.sh
