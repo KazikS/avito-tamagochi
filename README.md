@@ -13,9 +13,16 @@ make setup     # git-хуки этого клона. Без него pre-push н
 make up        # поднять стек в docker
 ```
 
-Postgres и миграции приезжают вместе с `feat/auth` (`docs/RECONCILIATION.md`): до
-мержа `make migrate` запускать не на чем. Остальные незаконченные цели сообщают
-о себе сами при запуске.
+`make up` поднимает Postgres и приложение. Строка подключения для локальных
+интеграционных тестов — та же, что в `docker-compose.yaml`:
+
+```bash
+export TEST_DATABASE_URL=postgres://tamagochi:tamagochi@localhost:5432/tamagochi?sslmode=disable
+```
+
+Пользователя, пароль и базу можно переопределить через `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `POSTGRES_DB` — в compose у них есть значения по умолчанию
+для локальной разработки. Сами миграции приезжают с ветками фич.
 
 Фронту не нужно ждать бэкенд: `make dev` поднимает стек и Prism-мок контракта
 на `:4010`, который отвечает прямо по `docs/openapi.json`.

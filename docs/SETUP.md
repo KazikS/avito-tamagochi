@@ -128,9 +128,8 @@ Git Bash сам по себе не хватит — `make` в нём нет.
 
 - **`make verify` падает на `golangci-lint`** с жалобой на неизвестные ключи
   конфига — стоит 1.x, нужен 2.x.
-- **`make up` поднимает контейнер, который сразу выходит** — до мержа `feat/auth`
-  в `docker-compose.yaml` нет Postgres, а приложение пока отдаёт только
-  `/healthz`. Это ожидаемо, см. `docs/RECONCILIATION.md`.
+- **`make up` не поднимается** — почти всегда не запущен демон Docker
+  (`colima start`); `make doctor` скажет прямо.
 - **`pre-push` ничего не проверяет** — не запущен `make setup`.
-- **`make migrate` не на чем запускать** — каталог `backend/migrations/`
-  приезжает с `feat/auth`.
+- **`make migrate` ничего не накатывает** — каталог `backend/migrations/`
+  приезжает с ветками фич; сама база поднимается `make up`.

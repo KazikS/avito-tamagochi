@@ -40,6 +40,7 @@ jobs:
           working-directory: backend
           version: v2.5.0
           args: --config=../.golangci.yaml
+      # @latest намеренно — почему, написано в Makefile у цели vuln.
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
         working-directory: backend
 

@@ -1,13 +1,43 @@
 services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tamagochi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tamagochi}
+      POSTGRES_DB: ${POSTGRES_DB:-tamagochi}
+    ports:
+      - "5432:5432"
+    # Именованный том, а не путь внутри репозитория: bind-mount с host-пути
+    # ломается на Colima, если репозиторий лежит вне $HOME, и мусорит в
+    # рабочем дереве.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tamagochi} -d ${POSTGRES_DB:-tamagochi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app_net
+
   server:
-    container_name: server
     build:
       context: ../../
       dockerfile: backend/build/package/Dockerfile
+    environment:
+      # Та же база, что и для локальных тестов; изнутри контейнера адрес — имя
+      # сервиса, а не localhost.
+      DATABASE_URL: postgres://${POSTGRES_USER:-tamagochi}:${POSTGRES_PASSWORD:-tamagochi}@postgres:5432/${POSTGRES_DB:-tamagochi}?sslmode=disable
     ports:
       - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - app_net
+
+volumes:
+  pgdata:
 
 networks:
   app_net:

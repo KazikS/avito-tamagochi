@@ -61,6 +61,13 @@ lint:
 	cd backend && golangci-lint run --config ../.golangci.yaml
 
 # Через go run, как в CI: verify не должен требовать предварительного make setup.
+# @latest здесь намеренно, хотя golangci-lint в CI запинен. Пробовал пинить —
+# не работает: `go run tool@версия` собирает инструмент локальным тулчейном, и
+# старый govulncheck отказывается разбирать модуль на более новом Go
+# («package requires newer Go version go1.25»). Ровно тот же капкан, что и с
+# `go run golangci-lint`. К тому же проверка недетерминирована по замыслу: база
+# уязвимостей живая, и покраснеть на новой CVE без правок в репозитории — это
+# то, что от неё нужно.
 vuln:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
