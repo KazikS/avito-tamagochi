@@ -7,9 +7,7 @@ help:  ## список команд
 setup:  ## git-хуки + инструменты
 	git config core.hooksPath .githooks
 	cd backend && go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-	cd backend && go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	cd backend && go install github.com/pressly/goose/v3/cmd/goose@latest
-	cd backend && go install golang.org/x/vuln/cmd/govulncheck@latest
 
 up:  ## поднять стек
 	docker compose -f backend/deployments/docker-compose.yaml up -d --wait
@@ -23,9 +21,8 @@ down:
 dev: up  ## стек + мок контракта для фронта (Prism на :4010)
 	npx --yes @stoplight/prism-cli mock docs/openapi.json -p 4010
 
-gen:  ## регенерация из контракта: Go + TypeScript + sqlc (шаг пропускается, пока не подключён)
+gen:  ## регенерация из контракта. ВНИМАНИЕ: кодоген ещё не подключён, сегодня это no-op
 	cd backend && go generate ./...
-	@if [ -f backend/sqlc.yaml ]; then cd backend && sqlc generate; else echo "gen: backend/sqlc.yaml ещё нет, пропуск"; fi
 	@if [ -d frontend ]; then cd frontend && npx rtk-query-codegen-openapi openapi-config.ts; else echo "gen: frontend/ ещё нет, пропуск"; fi
 
 migrate:  ## накатить миграции (goose — уже используется в feat/auth)
@@ -47,10 +44,14 @@ lint:
 	cd backend && go vet ./...
 	golangci-lint run
 
+# Через go run, как в CI: verify не должен требовать предварительного make setup.
 vuln:
-	cd backend && govulncheck ./...
+	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-verify: ## полный гейт — то же, что CI
+# Дрейф контракта (make gen && git diff --exit-code) сюда НЕ входит намеренно:
+# эта проверка требует чистого дерева и падала бы на любых незакоммиченных правках,
+# то есть ровно тогда, когда verify и запускают. Она живёт отдельным джобом в CI.
+verify: ## полный гейт: повторяет джоб backend из CI
 	cd backend && go build ./...
 	$(MAKE) test-race
 	$(MAKE) lint

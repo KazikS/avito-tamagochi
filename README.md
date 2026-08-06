@@ -1,29 +1,32 @@
 # Авито Тамагочи
 
 Питомец, который растёт от активности пользователя на Авито. Go + React.
+Хакатон, MVP в работе.
 
 ## Запуск
 
 ```bash
-make setup     # git-хуки и инструменты — сделай это первым, иначе pre-push не работает
+make setup     # git-хуки и инструменты. Сделай это первым: без него pre-push не работает
 make up        # postgres + сервер в docker
 make migrate   # накатить миграции (нужен DATABASE_URL)
 ```
 
-Фронту бэкенд не нужен, чтобы начать: `make dev` поднимает стек и Prism-мок контракта
-на `:4010` — он отвечает прямо по `docs/openapi.json`.
+Фронту не нужно ждать бэкенд: `make dev` поднимает стек и Prism-мок контракта
+на `:4010`, который отвечает прямо по `docs/openapi.json`.
 
 ## Проверка
 
 ```bash
 make test      # быстрый прогон
-make verify    # полный гейт: build + test -race + vet + lint + govulncheck (то же, что CI)
+make verify    # полный гейт: build + test -race + vet + lint + govulncheck
 ```
 
-`make verify` — то же, что гоняет CI на PR. Если он зелёный локально, PR не покраснеет.
+`make verify` повторяет джоб `backend` из CI. Второй джоб, `contract-drift`, локально
+не гоняется: он требует чистого дерева, а `verify` запускают как раз с незакоммиченными
+правками. Если `verify` зелёный — `backend` в CI не покраснеет.
 
-Интеграционные тесты, которым нужен настоящий Postgres, читают `TEST_DATABASE_URL`
-и пропускают себя, если переменная пуста:
+Интеграционные тесты (их ещё нет) будут брать строку подключения из
+`TEST_DATABASE_URL` и пропускать себя, если переменная пуста:
 
 ```bash
 TEST_DATABASE_URL=postgres://user:pass@localhost:5432/tamagochi make test
@@ -31,32 +34,26 @@ TEST_DATABASE_URL=postgres://user:pass@localhost:5432/tamagochi make test
 
 ## Где что лежит
 
-`go.mod` — в корне репозитория, код — в `backend/` (переезд `go.mod` в `backend/`
-запланирован, см. `docs/DECISIONS.md`). Один модуль на весь репозиторий.
+Один Go-модуль на репозиторий. `go.mod` пока в корне, код — в `backend/`; переезд
+`go.mod` в `backend/` запланирован (`docs/DECISIONS.md`).
 
 ```
 backend/cmd/          точка входа
-backend/internal/     фичевые пакеты: handler.go / service.go / repo.go
+backend/internal/     фичевые пакеты
 backend/pkg/          общая инфраструктура (postgres)
-backend/migrations/   goose
 docs/openapi.json     контракт — ground truth
 ```
 
-## Правила, которые стоит знать до первого PR
+## Что читать дальше
 
-- `docs/openapi.json` — источник истины. Меняешь форму запроса/ответа — правь спеку
-  в том же диффе и запускай `make gen`. Типы руками не пишем.
-- Ветки `feat/*`, `fix/*`, `chore/*`, PR маленькие, `main` всегда рабочий.
-- Conventional Commits: `feat(rewards): ...`.
-- Комментарии в коде — по-русски.
-- Слои проверяет линтер, а не ревью: `service.go` не знает про HTTP, в БД ходит
-  только `repo.go`. Красный `depguard` — архитектурная ошибка, а не придирка.
+- `AGENTS.md` — правила разработки: ветки, коммиты, слои, стоп-вопросы. Их же читают
+  ИИ-ассистенты, так что это единственный список правил, а не пересказ.
+- `docs/ARCHITECTURE.md` — раскладка, слои, инварианты.
+- `docs/DECISIONS.md` — что решено, что открыто, что отложено.
+- `docs/RECONCILIATION.md` — что чиним после мержа `feat/auth` и `feat/pet-service`.
 
-Подробнее: `AGENTS.md` (правила разработки, их же читают ИИ-ассистенты) ·
-`docs/DECISIONS.md` (что решено и что ещё открыто) · `docs/ARCHITECTURE.md` (слои,
-инварианты).
+## Ограничения на сегодня
 
-## Статус
-
-MVP в работе, хакатон. Что ещё не сделано и что осознанно отложено —
-`docs/DECISIONS.md`.
+Не работают, потому что нечему: `make seed` (нет `cmd/seed`), `make e2e` и фронтовая
+часть `make gen` (нет `frontend/`). Кодоген из контракта ещё не подключён — типы
+пока пишутся руками.
