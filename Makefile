@@ -1,5 +1,5 @@
 # Единая точка входа для людей и агентов — не собирайте флаги по памяти.
-.PHONY: help setup up buildup down dev gen migrate seed clock test test-race lint vuln hooks-test hooks-installed reconcile doctor verify e2e ci
+.PHONY: help setup up buildup down mock dev gen migrate seed clock test test-race lint vuln hooks-test hooks-installed reconcile doctor verify e2e ci
 
 help:  ## список команд
 	@grep -E '^[a-zA-Z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
@@ -30,8 +30,13 @@ buildup:  ## поднять стек, пересобрав образ
 down:
 	docker compose -f backend/deployments/docker-compose.yaml down -v
 
-dev: up  ## стек + мок контракта для фронта (Prism на :4010)
-	npx --yes @stoplight/prism-cli mock docs/openapi.json -p 4010
+mock:  ## только мок контракта на :4010 (без Docker) — этого хватает фронту
+	@# Версия запинена по той же причине, что у кодогена: мок — часть контракта,
+	@# и «вчера отвечал иначе» здесь так же дорого. Prism ещё и валидирует запрос
+	@# по спеке: тело не по контракту получает 422 с перечислением полей.
+	npx --yes @stoplight/prism-cli@5.16.0 mock docs/openapi.json -p 4010
+
+dev: up mock  ## стек в Docker + мок контракта на :4010
 
 gen:  ## регенерация типов из docs/openapi.json (Go + TS)
 	cd backend && go generate ./...

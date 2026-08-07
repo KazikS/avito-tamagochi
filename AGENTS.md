@@ -66,10 +66,10 @@ check them, don't trust this file to have been updated:
 Hit any of these and stop and ask. Details in `docs/DECISIONS.md` → «Открытое».
 
 **Reward entitlement** (may a `promoCode` be handed out as a string) · **the level
-curve** · **the pet concept** · **Redis** (default is no) · **Chakra v2 or v3**.
+curve** · **the pet concept** · **Redis** (default is no).
 
-Energy/progress and the auth model are no longer stop questions — both decided
-06.08. Everything else: decide it yourself, don't ask.
+Energy/progress, the auth model and Chakra (v3, picked by the frontend in code)
+are no longer stop questions. Everything else: decide it yourself, don't ask.
 
 ## Layout
 
