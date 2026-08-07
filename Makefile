@@ -74,6 +74,13 @@ test-race:
 # из корня репозитория (его расположение — требование кейса).
 lint:
 	cd backend && go vet ./...
+	@# config verify ОБЯЗАН идти перед run: `golangci-lint run` молча игнорирует
+	@# неизвестные ключи конфига и выходит с нулём. Из-за этого .golangci.yaml
+	@# был невалиден (ключ disable-all из v1) всю свою жизнь, а make lint
+	@# всё это время печатал «0 issues»: гейт структурно не мог поймать
+	@# собственную поломку. В CI это ловит golangci-lint-action начиная с v7,
+	@# здесь — эта строка.
+	cd backend && golangci-lint config verify --config ../.golangci.yaml
 	cd backend && golangci-lint run --config ../.golangci.yaml
 
 # Через go run, как в CI: verify не должен требовать предварительного make setup.
