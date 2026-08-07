@@ -20,7 +20,7 @@
 | Линтер | golangci-lint v2, конфиг в корне | `.golangci.yaml` |
 | Мок для фронта | Prism 5.16.0 из `openapi.json`, с валидацией запросов | цель `mock` в `Makefile` |
 | Кодоген Go из контракта | oapi-codegen v2.8.0, **только типы** | `backend/internal/api/types.gen.go` |
-| Кодоген TS из контракта | openapi-typescript 7.13.0 (выбрал фронт) | скрипт `gen:api` в `frontend/package.json` |
+| Кодоген TS из контракта | openapi-typescript (выбрал фронт, версия — в самом скрипте) | скрипт `gen:api` в `frontend/package.json` |
 | UI-библиотека | Chakra UI **v3** (выбрал фронт) | `"@chakra-ui/react": "^3"` в `frontend/package.json` |
 | Go | `1.25.0` | строка `go` в `backend/go.mod` |
 | Общая инфраструктура | `backend/pkg/`, не `internal/platform/` | каталог `backend/pkg/` |
