@@ -646,19 +646,9 @@ type Config struct {
 
 	// DailyCareXpCap Examples: 40
 	DailyCareXpCap *int `json:"dailyCareXpCap,omitempty"`
-	LevelCurve     *struct {
-		// Base Examples: 100
-		Base *int `json:"base,omitempty"`
 
-		// Factor Examples: 1.25
-		Factor *float32 `json:"factor,omitempty"`
-
-		// MaxLevel Examples: 25
-		MaxLevel *int `json:"maxLevel,omitempty"`
-
-		// RoundTo Examples: 10
-		RoundTo *int `json:"roundTo,omitempty"`
-	} `json:"levelCurve,omitempty"`
+	// LevelCurve Стоимость перехода на уровень L = base * factor^(L-2), округлённая до roundTo. Именованная схема, а не вложенный объект: из вложенного кодогенератор делает анонимную структуру, которую в Go нельзя собрать, не переписав её объявление вместе с тегами.
+	LevelCurve *LevelCurve  `json:"levelCurve,omitempty"`
 	Milestones *[]Milestone `json:"milestones,omitempty"`
 	Moods      *[]struct {
 		// Id Производная от МИНИМАЛЬНОГО показателя. Клиент её не вычисляет
@@ -792,6 +782,21 @@ type LeaderboardPage struct {
 
 // LeaderboardPageScope defines model for LeaderboardPage.Scope.
 type LeaderboardPageScope string
+
+// LevelCurve Стоимость перехода на уровень L = base * factor^(L-2), округлённая до roundTo. Именованная схема, а не вложенный объект: из вложенного кодогенератор делает анонимную структуру, которую в Go нельзя собрать, не переписав её объявление вместе с тегами.
+type LevelCurve struct {
+	// Base Examples: 100
+	Base *int `json:"base,omitempty"`
+
+	// Factor Examples: 1.25
+	Factor *float32 `json:"factor,omitempty"`
+
+	// MaxLevel Examples: 25
+	MaxLevel *int `json:"maxLevel,omitempty"`
+
+	// RoundTo Examples: 10
+	RoundTo *int `json:"roundTo,omitempty"`
+}
 
 // Me defines model for Me.
 type Me struct {

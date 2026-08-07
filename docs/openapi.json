@@ -96,7 +96,8 @@
       "get": {
         "tags": ["config"],
         "summary": "Справочник экономики",
-        "description": "Фронт берёт отсюда скорость падения показателей, эффекты действий, пороги настроений, кривую уровней и множители стрика. Хардкодить эти числа в клиенте запрещено: при смене баланса разъедется. Кэшируется на сутки, поддерживает ETag.",
+        "description": "Фронт берёт отсюда скорость падения показателей, эффекты действий, пороги настроений, кривую уровней и множители стрика. Хардкодить эти числа в клиенте запрещено: при смене баланса разъедется. Кэшируется на сутки, поддерживает ETag.\n\nЕДИНСТВЕННЫЙ публичный эндпоинт: security переопределён на пустой список. Причина — это таблица констант, одинаковая для всех, и требовать токен ради неё значит запретить фронту рисовать что-либо до того, как приедет авторизация. Следствие, которое надо держать: сюда нельзя класть ничего, что зависит от пользователя. Персональный прогресс по вехам отдаёт GET /streak/milestones, а не это поле.",
+        "security": [],
         "responses": {
           "200": { "description": "Константы экономики", "content": { "application/json": { "schema": {
             "allOf": [ { "$ref": "#/components/schemas/Envelope" },
@@ -843,6 +844,15 @@
         }
       },
 
+      "LevelCurve": {
+        "type": "object",
+        "description": "Стоимость перехода на уровень L = base * factor^(L-2), округлённая до roundTo. Именованная схема, а не вложенный объект: из вложенного кодогенератор делает анонимную структуру, которую в Go нельзя собрать, не переписав её объявление вместе с тегами.",
+        "properties": { "base": { "type": "integer", "examples": [100] },
+                        "factor": { "type": "number", "examples": [1.25] },
+                        "roundTo": { "type": "integer", "examples": [10] },
+                        "maxLevel": { "type": "integer", "examples": [25] } }
+      },
+
       "Config": {
         "type": "object",
         "properties": {
@@ -857,11 +867,7 @@
           "moods": { "type": "array", "items": { "type": "object",
             "properties": { "id": { "$ref": "#/components/schemas/PetMood" }, "label": { "type": "string" },
                             "minStat": { "type": "integer" }, "multiplier": { "type": "number" } } } },
-          "levelCurve": { "type": "object",
-            "properties": { "base": { "type": "integer", "examples": [100] },
-                            "factor": { "type": "number", "examples": [1.25] },
-                            "roundTo": { "type": "integer", "examples": [10] },
-                            "maxLevel": { "type": "integer", "examples": [25] } } },
+          "levelCurve": { "$ref": "#/components/schemas/LevelCurve" },
           "streakTiers": { "type": "array", "items": { "type": "object",
             "properties": { "from": { "type": "integer" }, "multiplier": { "type": "number" } } } },
           "milestones": { "type": "array", "items": { "$ref": "#/components/schemas/Milestone" } }
