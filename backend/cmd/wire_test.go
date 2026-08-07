@@ -4,10 +4,21 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"tamagochi/internal/api"
 )
+
+// configPath — путь целиком, литералом.
+//
+// Намеренно НЕ собирается из apiPrefix: тест, который строит адрес из той же
+// константы, что проверяет, зелёный при любом её значении. Первая версия этого
+// файла именно так и была написана и пережила подмену префикса на "/v1".
+const configPath = "/api/v1/config"
 
 // envelope — разбор ответа так, как его увидит клиент контракта.
 type envelope struct {
@@ -29,11 +40,60 @@ func do(t *testing.T, method, path string) (*httptest.ResponseRecorder, envelope
 	return rec, env
 }
 
-// Маршрут смонтирован ровно там, где его ищет клиент: префикс берётся из блока
-// servers контракта. Тест поймает и опечатку в префиксе, и его случайное
-// исчезновение.
-func TestConfigMountedUnderAPIPrefix(t *testing.T) {
-	rec, env := do(t, http.MethodGet, apiPrefix+"/config")
+// specAPIPrefix достаёт префикс из блока servers контракта.
+//
+// Это единственное, что связывает константу apiPrefix со спекой: без такой
+// проверки они расходятся молча, и сервер начинает отдавать эндпоинты не по
+// тем адресам, по которым их ищет сгенерированный из спеки клиент.
+func specAPIPrefix(t *testing.T) string {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "docs", "openapi.json"))
+	if err != nil {
+		t.Fatalf("не читается контракт: %v", err)
+	}
+
+	var spec struct {
+		Servers []struct {
+			URL string `json:"url"`
+		} `json:"servers"`
+	}
+	if unmarshalErr := json.Unmarshal(raw, &spec); unmarshalErr != nil {
+		t.Fatalf("контракт не разбирается: %v", unmarshalErr)
+	}
+	if len(spec.Servers) == 0 {
+		t.Fatal("в контракте нет блока servers")
+	}
+
+	var prefix string
+	for i, server := range spec.Servers {
+		parsed, parseErr := url.Parse(server.URL)
+		if parseErr != nil {
+			t.Fatalf("servers[%d].url не разбирается: %v", i, parseErr)
+		}
+		path := strings.TrimSuffix(parsed.Path, "/")
+		switch {
+		case i == 0:
+			prefix = path
+		case path != prefix:
+			// Прод и локальный стенд обязаны отдавать API по одному пути,
+			// иначе один и тот же клиент не соберётся под оба.
+			t.Fatalf("servers расходятся по префиксу: %q и %q", prefix, path)
+		}
+	}
+	return prefix
+}
+
+// Константа маршрутизации и контракт обязаны совпадать.
+func TestAPIPrefixMatchesContract(t *testing.T) {
+	if want := specAPIPrefix(t); apiPrefix != want {
+		t.Errorf("apiPrefix=%q, а в servers контракта %q", apiPrefix, want)
+	}
+}
+
+// Путь, записанный в контракте, обязан обслуживаться.
+func TestConfigMountedAtContractPath(t *testing.T) {
+	rec, env := do(t, http.MethodGet, configPath)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("статус: получили %d, ожидали %d (тело: %q)", rec.Code, http.StatusOK, rec.Body.String())
@@ -67,7 +127,7 @@ func TestConfigNotServedWithoutPrefix(t *testing.T) {
 
 // Несуществующий маршрут отвечает конвертом контракта, а не текстом Gin'а.
 func TestNoRouteReturnsEnvelope(t *testing.T) {
-	rec, env := do(t, http.MethodGet, apiPrefix+"/такого-нет")
+	rec, env := do(t, http.MethodGet, "/api/v1/такого-нет")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("статус: получили %d, ожидали %d", rec.Code, http.StatusNotFound)
@@ -82,13 +142,26 @@ func TestNoRouteReturnsEnvelope(t *testing.T) {
 
 // Существующий путь с неподдерживаемым методом: 405 и снова конверт.
 func TestNoMethodReturnsEnvelope(t *testing.T) {
-	rec, env := do(t, http.MethodPost, apiPrefix+"/config")
+	rec, env := do(t, http.MethodPost, configPath)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("статус: получили %d, ожидали %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 	if env.Meta.Code != http.StatusMethodNotAllowed {
 		t.Errorf("meta.code: получили %d, ожидали %d", env.Meta.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+// RFC 9110 требует в ответе 405 заголовок Allow. Его проставляет сам Gin, до
+// того как позвать наш обработчик NoMethod, — то есть свойство держится не
+// нашим кодом, а чужим, и молча исчезнет при обновлении Gin. Тест — это
+// единственное, что о таком сообщит.
+func TestMethodNotAllowedCarriesAllowHeader(t *testing.T) {
+	rec := httptest.NewRecorder()
+	mustRouter(t).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, configPath, nil))
+
+	if got := rec.Header().Get("Allow"); got != http.MethodGet {
+		t.Errorf("Allow: получили %q, ожидали %q", got, http.MethodGet)
 	}
 }
 
