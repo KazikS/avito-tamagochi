@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Conventional Commits — ПОДСКАЗКА, а не запрет.
+#
+# Правило висело в AGENTS.md прозой и не проверялось ничем. Но блокировать
+# коммит из-за формата сообщения на семидневном хакатоне — вредить работе:
+# человек в середине отладки не должен воевать с хуком. Поэтому здесь только
+# предупреждение в stderr, exit 0 всегда. Коммит уходит в любом случае.
+set -uo pipefail
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+
+# Первая непустая строка, не комментарий.
+subject=$(grep -v '^#' "$msg_file" | grep -m1 -v '^[[:space:]]*$' || true)
+[ -z "$subject" ] && exit 0
+
+# merge/revert/fixup пропускаем — их формат задаёт git.
+case "$subject" in
+  Merge\ *|Revert\ *|fixup!*|squash!*) exit 0 ;;
+esac
+
+pattern='^(feat|fix|chore|docs|test|refactor|perf|build|ci)(\([a-z0-9._/-]+\))?!?: .+'
+if ! printf '%s' "$subject" | grep -qE "$pattern"; then
+  cat >&2 <<'HINT'
+commit-msg: сообщение не по Conventional Commits (AGENTS.md → «Всегда»).
+  Ожидается:  feat(rewards): выдача награды в транзакции
+  Типы:       feat fix chore docs test refactor perf build ci
+Коммит НЕ отменён — это подсказка. Поправить последнее сообщение:
+  git commit --amend
+HINT
+fi
+
+exit 0

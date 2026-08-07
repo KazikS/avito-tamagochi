@@ -1,0 +1,64 @@
+name: CI
+on:
+  pull_request:
+  push: { branches: [main] }
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    # Postgres поднимается здесь, чтобы интеграционные тесты и тест на гонку
+    # claim'а реально выполнялись: они гейтятся TEST_DATABASE_URL и без него
+    # молча пропускаются (t.Skip). Гейт, который всегда пропускается, — не гейт.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: tamagochi
+          POSTGRES_PASSWORD: tamagochi
+          POSTGRES_DB: tamagochi_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://tamagochi:tamagochi@localhost:5432/tamagochi_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with: { go-version: '1.25', cache-dependency-path: backend/go.sum }
+      - run: go build ./...
+        working-directory: backend
+      # -race обязателен: тест на однократность выдачи награды без него бессмыслен.
+      - run: go test ./... -race
+        working-directory: backend
+      - run: go vet ./...
+        working-directory: backend
+      # Экшен v9, а не v6: v6 умеет только golangci-lint 1.x и на пине v2.5.0
+      # падает ещё до запуска («golangci-lint v2 is not supported»). v7 и v8
+      # понимают v2, но собраны под node20 — GitHub гонит их на node24 с
+      # предупреждением об устаревании. v9 — первый на node24.
+      # version обязателен: .golangci.yaml — схема v2, её понимает только
+      # golangci-lint 2.x. Без явного пина шаг падает на разборе конфига.
+      # Экшен с v7 сам гоняет `config verify` по JSON-схеме — из-за этого
+      # и вскрылся v1-ключ disable-all в .golangci.yaml.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: backend
+          version: v2.5.0
+          args: --config=../.golangci.yaml
+      # @latest намеренно — почему, написано в Makefile у цели vuln.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        working-directory: backend
+
+  contract-drift:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with: { go-version: '1.25', cache-dependency-path: backend/go.sum }
+      # Кто-то правил сгенерированные типы руками или спеку без регенерации — упадёт здесь.
+      # Проверено намеренной поломкой: правка types.gen.go роняет этот шаг.
+      - run: make gen && git diff --exit-code
+
+  # frontend и e2e джобы добавляются, когда появится frontend/ — см. docs/DECISIONS.md
+  # → «не сделанная работа». Не добавлены заранее, чтобы CI не был красным на пустом месте.

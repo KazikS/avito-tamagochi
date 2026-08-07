@@ -1,0 +1,128 @@
+# golangci-lint v2. Живёт в корне проекта — прямое требование кейса.
+#
+# Слоевые правила (depguard/forbidigo) описывают ЦЕЛЕВУЮ раскладку
+# internal/<tag>/{handler,service,repo}.go — см. docs/ARCHITECTURE.md.
+# Код на feat/auth и feat/pet-service её ещё не использует, поэтому эти
+# правила пока ничего не проверяют (глобы не совпадают ни с одним файлом) —
+# это ожидаемо до реконсиляции веток, не бага конфига.
+version: "2"
+
+issues:
+  max-same-issues: 50
+
+linters:
+  # v2-синтаксис. Ключ disable-all — из v1: `run` его молча игнорирует,
+  # а `golangci-lint config verify` (его гоняет golangci-lint-action c v7)
+  # отвергает по JSON-схеме. Набор линтеров при замене не меняется.
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - errorlint
+    - gosec
+    - gocritic
+    - ineffassign
+    - unused
+    - bodyclose
+    - sqlclosecheck
+    - rowserrcheck
+    - durationcheck
+    - exhaustive
+    - makezero
+    - nilerr
+    - unconvert
+    - revive
+    - depguard
+    - forbidigo
+
+  settings:
+    gocritic:
+      settings:
+        captLocal:
+          paramsOnly: false
+        underef:
+          skipRecvDeref: false
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+      settings:
+        shadow:
+          strict: true
+
+    errcheck:
+      check-type-assertions: true
+
+    exhaustive:
+      check:
+        - switch
+        - map
+
+    # --- Архитектура: слои проверяет линтер, а не ревью ---
+    depguard:
+      rules:
+        service-layer:
+          files:
+            - "**/internal/*/service.go"
+            - "!$test"
+          deny:
+            - pkg: net/http
+              desc: "доменная логика не знает про HTTP — это слой handler.go"
+            - pkg: github.com/gin-gonic/gin
+              desc: "Gin только в handler.go"
+            - pkg: github.com/jackc/pgx
+              desc: "БД только в repo.go, через интерфейс"
+            - pkg: tamagochi/pkg/postgres
+              desc: "БД только в repo.go"
+
+        handler-layer:
+          files:
+            - "**/internal/*/handler.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: "handler не ходит в БД — вызывай service, тот вызывает repo"
+            - pkg: tamagochi/pkg/postgres
+              desc: "handler не ходит в БД напрямую"
+
+        # backend/pkg — общая платформа (postgres, позже ws/ingest), ниже фич.
+        # Реальный путь, не internal/platform — pkg/postgres уже используется
+        # в feat/auth и feat/pet-service, переименовывать под ними накладно.
+        platform-layer:
+          files:
+            - "**/backend/pkg/**"
+            - "!$test"
+          deny:
+            - pkg: tamagochi/internal
+              desc: "pkg/ ниже фич и не импортирует internal/**"
+
+    # --- Время: параметром, не из часов внутри домена ---
+    forbidigo:
+      forbid:
+        - pattern: '^time\.Now$'
+          msg: "время в домене — параметр (decay(state, from, to)), не time.Now() внутри. Часы читаются в pkg/ и cmd/."
+      analyze-types: true
+
+  exclusions:
+    paths:
+      - configs
+      - deployments
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+    rules:
+      # Часы читаются на границе — там это законно.
+      - path: 'backend/pkg/'
+        linters: [forbidigo]
+      - path: 'backend/cmd/'
+        linters: [forbidigo]
+      - path: '_test\.go'
+        linters: [gosec, forbidigo]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
