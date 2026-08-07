@@ -1,11 +1,11 @@
-import { useTheme } from "next-themes";
-import type { UseColorModeReturn, ColorMode } from "./color-mode";
+import { useTheme } from 'next-themes';
+import type { UseColorModeReturn, ColorMode } from './color-mode';
 
 export function useColorMode(): UseColorModeReturn {
   const { resolvedTheme, setTheme, forcedTheme } = useTheme();
-  const colorMode = forcedTheme || resolvedTheme;
+  const colorMode = forcedTheme ?? resolvedTheme;
   const toggleColorMode = () => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark");
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
   return {
     colorMode: colorMode as ColorMode,
@@ -16,5 +16,5 @@ export function useColorMode(): UseColorModeReturn {
 
 export function useColorModeValue<T>(light: T, dark: T) {
   const { colorMode } = useColorMode();
-  return colorMode === "dark" ? dark : light;
+  return colorMode === 'dark' ? dark : light;
 }
