@@ -5,10 +5,9 @@
 // До этого main печатал строку и сразу выходил, поэтому контейнер немедленно
 // умирал, а `docker compose up --wait` падал на вышедшем сервисе.
 //
-// Роутинг сознательно на стандартной библиотеке, а не на Gin: маршруты живут
-// в `internal/http/routers` на ветке feat/pet-service, и при её мерже этот файл
-// заменяется обычным wiring'ом (роутер + пул Postgres + сервисы). Заводить Gin
-// здесь заранее — значит разойтись с той веткой на ровном месте.
+// Роутер на Gin — так записано в docs/DECISIONS.md («В коде») и так написан
+// feat/pet-service; сборка маршрутов живёт в cmd/wire.go, чтобы мерж чужой
+// ветки трогал этот файл минимально.
 package main
 
 import (
@@ -23,31 +22,25 @@ import (
 	"time"
 )
 
-// newMux собирает роутер. Вынесено из main, чтобы его можно было проверить
-// тестом: `go test -race` объявлен гейтом и в Makefile, и в CI, а гейт без
-// единого теста ничего не проверяет — ровно та же ошибка, из-за которой
-// Stop-хук всю свою жизнь молча выходил с нулём.
-func newMux() *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
-	return mux
-}
-
 func main() {
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 
-	mux := newMux()
+	// Роутер собирается до слушателя: ошибка в константах экономики должна
+	// ронять процесс на старте, а не отдавать 500 на первом запросе.
+	// Имя routerErr, а не err: ниже по функции err объявляют внутри if'ов, и
+	// функциональная переменная err их бы затеняла (govet shadow, strict).
+	// Тот же приём уже применён ниже для lnErr.
+	router, routerErr := newRouter()
+	if routerErr != nil {
+		log.Fatalf("не могу собрать роутер: %v", routerErr)
+	}
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

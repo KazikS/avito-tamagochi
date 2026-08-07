@@ -8,14 +8,24 @@ import (
 	"testing"
 )
 
-// Первый тест в репозитории. До него `go test ./... -race` проходил, не проверив
-// ни одной строки: гейт был объявлен в Makefile и в CI, но проверять ему было
-// нечего. Тест намеренно простой — ценность не в покрытии /healthz, а в том,
-// что путь «есть тест → он гоняется под -race → красный тест роняет гейт»
-// теперь действительно существует.
+// mustRouter собирает роутер или валит тест: во всех тестах ниже ошибка сборки
+// означает сломанные константы, а не проверяемое поведение.
+func mustRouter(t *testing.T) http.Handler {
+	t.Helper()
+	r, err := newRouter()
+	if err != nil {
+		t.Fatalf("newRouter: %v", err)
+	}
+	return r
+}
+
+// До первого теста `go test ./... -race` проходил, не проверив ни одной строки:
+// гейт был объявлен в Makefile и в CI, но проверять ему было нечего. Ценность
+// не в покрытии /healthz, а в том, что путь «есть тест → он гоняется под -race
+// → красный тест роняет гейт» существует.
 func TestHealthz(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newMux().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	mustRouter(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("статус: получили %d, ожидали %d", rec.Code, http.StatusOK)
@@ -34,10 +44,9 @@ func TestHealthz(t *testing.T) {
 }
 
 // Роутер один на все горутины сервера, поэтому под -race имеет смысл проверить
-// именно конкурентное обслуживание: гонку в общем состоянии хендлера этот тест
-// увидит, последовательный — нет.
+// именно конкурентное обслуживание.
 func TestHealthzConcurrent(t *testing.T) {
-	mux := newMux()
+	router := mustRouter(t)
 
 	var wg sync.WaitGroup
 	for range 50 {
@@ -45,7 +54,7 @@ func TestHealthzConcurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			rec := httptest.NewRecorder()
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 			if rec.Code != http.StatusOK {
 				t.Errorf("статус под нагрузкой: %d", rec.Code)
 			}
@@ -54,11 +63,12 @@ func TestHealthzConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
-// Метод, которого нет, должен давать 405, а не 200: ServeMux с шаблоном
-// "GET /healthz" обязан отклонять POST.
+// Метод, которого нет, должен давать 405, а не 404: это разные вещи для
+// клиента, и Gin различает их только при HandleMethodNotAllowed = true.
+// Тест держит именно эту настройку — без неё ответ станет 404.
 func TestHealthzRejectsPost(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newMux().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/healthz", nil))
+	mustRouter(t).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/healthz", nil))
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("POST /healthz: получили %d, ожидали %d", rec.Code, http.StatusMethodNotAllowed)
