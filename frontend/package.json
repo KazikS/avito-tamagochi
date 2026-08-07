@@ -11,7 +11,8 @@
     "lint:ci": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "gen:api": "npx -y openapi-typescript@7.13.0 ../docs/openapi.json -o src/shared/types/api.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.1",
