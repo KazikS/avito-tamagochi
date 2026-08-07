@@ -52,15 +52,19 @@ TEST_DATABASE_URL=postgres://user:pass@localhost:5432/tamagochi make test
 
 ## Где что лежит
 
-Один Go-модуль на репозиторий. `go.mod` пока в корне, код — в `backend/`; переезд
-`go.mod` в `backend/` запланирован (`docs/DECISIONS.md`).
+Один Go-модуль на репозиторий, его корень — `backend/`, поэтому все команды с
+Go запускаются оттуда (в `Makefile` и в CI это уже сделано).
 
 ```
-backend/cmd/          точка входа
-backend/internal/     фичевые пакеты
-backend/pkg/          общая инфраструктура (postgres)
+backend/cmd/          точка входа и сборка роутера
+backend/internal/     фичевые пакеты, по одному на тег OpenAPI
+backend/pkg/          общая инфраструктура, ниже всех фич
 docs/openapi.json     контракт — ground truth
 ```
+
+Раскладка целиком, таблица «кто кого может импортировать» и инварианты —
+`docs/ARCHITECTURE.md`. Здесь намеренно только ориентир: один факт живёт
+в одном месте.
 
 ## Что читать дальше
 

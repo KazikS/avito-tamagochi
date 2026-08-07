@@ -48,11 +48,36 @@
       `feat/pet-service` — `id UUID, username, password_hash`. Нужна одна схема.
       Заодно: `repository/user.go` пишет `INSERT INTO users (login, password)`,
       то есть код и схема `feat/pet-service` расходятся по именам колонок
-- [ ] `internal/websocket`: `RemoveClient` читает карту вне блокировки и делает
-      `conn.Close()` по nil, если ключа нет — гонка плюс паника. Плюс ключ — это
-      request ID (`RequestIDKey` и `requestIDKey` — одно значение), а не user ID
-- [ ] gorilla требует, чтобы в соединение писала одна горутина: менеджеру нужен
-      мьютекс на запись до того, как появится пуш состояния
+- [ ] `internal/websocket` из `feat/pet-service` не чинить по месту, а заменить на
+      `pkg/wsh`: там уже закрыты все три дефекта — `RemoveClient` читал карту вне
+      блокировки и делал `conn.Close()` по nil; ключом служил request ID
+      (`RequestIDKey` и `requestIDKey` — одно значение), а не user ID; записи
+      в соединение не были сериализованы, хотя gorilla допускает одну пишущую
+      горутину. Каждый из трёх закрыт тестом, который краснеет при откате правки
+
+## Куда переезжает `feat/pet-service`
+
+Раскладка ветки старше решения от 06.08 о целевой (`docs/ARCHITECTURE.md`), поэтому
+мерж — это переименования, а не переписывание. Соответствие файлов:
+
+| `feat/pet-service` | цель | что меняется по смыслу |
+|---|---|---|
+| `internal/usecase/pet.go` | `internal/pet/service.go` | ничего, кроме пакета; `time.Now()` внутри домена запрещён — часы приходят из `pkg/clock` |
+| `internal/repository/pet.go`, `progress.go` | `internal/pet/repo.go` | единственное место с SQL |
+| `internal/http/handlers/pet.go` | `internal/pet/handler.go` | ответы через `internal/httpx`, а не `gin.H{"error": ...}`: конверт контракта клиент разбирает, `gin.H` — нет |
+| `internal/http/handlers/websocket.go` | `internal/pet/handler.go` | идентификатор пользователя из `pkg/authctx`, соединения — в `pkg/wsh` |
+| `internal/websocket/manager.go` | `pkg/wsh` | удаляется: глобальный `Manager` заменён хабом, который передаётся явно |
+| `internal/models/pet.go` | `internal/pet/` или типы контракта | формы запросов и ответов берутся из `internal/api`, руками не дублируются |
+| `internal/http/routers/routers.go` | `cmd/wire.go` | пакет фичи отдаёт `Register(gin.IRoutes)`, префикс `/api/v1` вешает `cmd/` |
+
+Импорты при этом чинятся сами: `tamagochi/backend/...` → `tamagochi/...`.
+
+По `go.mod` конфликт должен быть меньше, чем описано выше в таблице: `gin` и
+`gorilla/websocket` запинены здесь ровно тех версий, что в ветке (`v1.12.0` и
+`v1.5.3`), поэтому их строки совпадут дословно. `pgx/v5` здесь **не** зависимость
+— ни один пакет пока не ходит в базу, — и приедет он с той ветки, которая первой
+напишет `repo.go`; в `feat/auth` и `feat/pet-service` это одна и та же версия
+`v5.10.0`, так что между собой они тоже не разойдутся.
 - [ ] свести две раскладки к целевой (`docs/ARCHITECTURE.md`)
 - [x] проверено, что `depguard` краснеет на нарушении слоя (прогон на временных
       файлах). Осталось, чтобы под правила попал настоящий код — см. пункт выше
