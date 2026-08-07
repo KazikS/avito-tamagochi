@@ -11,7 +11,10 @@ issues:
   max-same-issues: 50
 
 linters:
-  disable-all: true
+  # v2-синтаксис. Ключ disable-all — из v1: `run` его молча игнорирует,
+  # а `golangci-lint config verify` (его гоняет golangci-lint-action c v7)
+  # отвергает по JSON-схеме. Набор линтеров при замене не меняется.
+  default: none
   enable:
     - errcheck
     - govet

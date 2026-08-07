@@ -23,8 +23,8 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://tamagochi:tamagochi@localhost:5432/tamagochi_test?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with: { go-version: '1.25', cache-dependency-path: backend/go.sum }
       - run: go build ./...
         working-directory: backend
@@ -33,9 +33,15 @@ jobs:
         working-directory: backend
       - run: go vet ./...
         working-directory: backend
+      # Экшен v9, а не v6: v6 умеет только golangci-lint 1.x и на пине v2.5.0
+      # падает ещё до запуска («golangci-lint v2 is not supported»). v7 и v8
+      # понимают v2, но собраны под node20 — GitHub гонит их на node24 с
+      # предупреждением об устаревании. v9 — первый на node24.
       # version обязателен: .golangci.yaml — схема v2, её понимает только
       # golangci-lint 2.x. Без явного пина шаг падает на разборе конфига.
-      - uses: golangci/golangci-lint-action@v6
+      # Экшен с v7 сам гоняет `config verify` по JSON-схеме — из-за этого
+      # и вскрылся v1-ключ disable-all в .golangci.yaml.
+      - uses: golangci/golangci-lint-action@v9
         with:
           working-directory: backend
           version: v2.5.0
@@ -47,8 +53,8 @@ jobs:
   contract-drift:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with: { go-version: '1.25', cache-dependency-path: backend/go.sum }
       # Кто-то правил сгенерированные типы руками или спеку без регенерации — упадёт здесь.
       # Проверено намеренной поломкой: правка types.gen.go роняет этот шаг.
