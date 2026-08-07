@@ -94,13 +94,16 @@ fi
 
 # --- Node: нужен только для npx (Prism-мок, позже фронт) ---
 if command -v node >/dev/null 2>&1; then
-  ok "node" "$(node --version) — нужен для npx: Prism-мок в make dev"
+  ok "node" "$(node --version) — нужен для npx: make mock и TS-часть make gen"
 else
-  soft "node" "не найден. Без него не работает make dev (Prism-мок контракта для фронта)"
+  soft "node" "не найден. Без него не работает make mock (Prism-мок) и TS-часть make gen"
 fi
 
 # --- Go-инструменты: репозиторий их НЕ ставит, они опциональны ---
-for t in goose oapi-codegen; do
+# oapi-codegen сюда не входит намеренно: его версия запинена в //go:generate и
+# запускается через go run. Установленный глобально другой версией он бы дал
+# другой types.gen.go и красный contract-drift.
+for t in goose; do
   command -v "$t" >/dev/null 2>&1 \
     && ok "$t" "$( "$t" --version 2>&1 | head -1 | cut -c1-40 )" \
     || soft "$t" "нет — ставится по надобности, команда в docs/SETUP.md"

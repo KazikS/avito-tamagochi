@@ -62,9 +62,10 @@ go install github.com/pressly/goose/v3/cmd/goose@latest
 
 **Node.js 20+** (`npx` идёт в комплекте). Нужен для:
 
-- `make dev` — Prism-мок контракта на `:4010`. Ставить Prism отдельно не нужно,
-  `npx --yes @stoplight/prism-cli` скачает его сам.
-- позже — кодоген TypeScript-хуков и Playwright.
+- `make mock` — Prism-мок контракта на `:4010` (в `make dev` он же плюс Docker).
+  Ставить Prism отдельно не нужно, `npx` скачает запиненную версию сам.
+- `make gen` — TS-часть кодогена; Go-часть работает и без Node.
+- позже — Playwright.
 
 Бэкенду Node не нужен: без него не работает `make dev`, а `make gen` перегенерирует
 только Go-типы и честно скажет, что TS-часть пропустил. Гейт всё равно в CI.
