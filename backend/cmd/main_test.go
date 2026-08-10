@@ -6,13 +6,21 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+
+	"tamagochi/pkg/pgtest"
 )
 
 // mustRouter собирает роутер или валит тест: во всех тестах ниже ошибка сборки
 // означает сломанные константы, а не проверяемое поведение.
+//
+// С приездом internal/pet роутер требует настоящий пул (см. комментарий у
+// newRouter в wire.go) — даже для тестов, которым база не нужна семантически
+// (healthz, /config): собрать роутер без базы значит проверить не тот роутер,
+// что поедет в прод. pgtest.Pool сам пропускает тест, если TEST_DATABASE_URL
+// не выставлена, — тем же способом, каким это уже делают тесты internal/pet.
 func mustRouter(t *testing.T) http.Handler {
 	t.Helper()
-	r, err := newRouter()
+	r, err := newRouter(pgtest.Pool(t))
 	if err != nil {
 		t.Fatalf("newRouter: %v", err)
 	}

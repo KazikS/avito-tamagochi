@@ -60,5 +60,23 @@ jobs:
       # Проверено намеренной поломкой: правка types.gen.go роняет этот шаг.
       - run: make gen && git diff --exit-code
 
-  # frontend и e2e джобы добавляются, когда появится frontend/ — см. docs/DECISIONS.md
-  # → «не сделанная работа». Не добавлены заранее, чтобы CI не был красным на пустом месте.
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: '22', cache: 'npm', cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint:ci
+        working-directory: frontend
+      - run: npm run format:check
+        working-directory: frontend
+      # tsc -b — часть build, отдельным шагом не дублируем.
+      - run: npm run build
+        working-directory: frontend
+
+  # e2e не добавлен: playwright не установлен зависимостью, спеков нет — это
+  # реальная незакрытая работа, не заглушка (README.md → «Для защиты»),
+  # запускать `docker compose up` + `npx playwright test` без единого теста
+  # значило бы гонять CI-джобу, которая всегда молча проходит.

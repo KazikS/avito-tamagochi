@@ -13,7 +13,8 @@ description: Execute an approved plan test-first. Use after /plan.
 4. Для функций со временем — тест внутри `synctest.Test`, время параметром,
    без `time.Sleep`.
 5. Для claim и идемпотентности — тест на гонку с `-race` против настоящего Postgres
-   (testcontainers), не «должно работать».
+   (`pkg/pgtest`, `TEST_DATABASE_URL`, `t.Skip` если пусто — решено в
+   `docs/DECISIONS.md`, testcontainers-go сознательно не взят), не «должно работать».
 
 Для хендлеров, `repo.go` и wiring TDD не требуется: достаточно, чтобы компилировалось
 и проходил один сквозной сценарий.

@@ -1,3 +1,9 @@
 .idea
 .DS_Store
 .claude/settings.local.json
+
+# Секреты в окружение, не в репозиторий (GIGACHAT_AUTH_KEY и подобные) —
+# см. docs/SETUP.md.
+.env
+.env.*
+!.env.example

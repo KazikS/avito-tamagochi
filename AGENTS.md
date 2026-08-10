@@ -65,11 +65,13 @@ check them, don't trust this file to have been updated:
 
 Hit any of these and stop and ask. Details in `docs/DECISIONS.md` → «Открытое».
 
-**Reward entitlement** (may a `promoCode` be handed out as a string) · **the level
-curve** · **the pet concept** · **Redis** (default is no).
+**The level curve** · **the pet concept** (narrowed, not closed — see
+`docs/DECISIONS.md`) · **Redis** (default is no).
 
-Energy/progress, the auth model and Chakra (v3, picked by the frontend in code)
-are no longer stop questions. Everything else: decide it yourself, don't ask.
+Energy/progress, the auth model, Chakra (v3, picked by the frontend in code),
+and reward entitlement (decided 10.08 — an entitlement row, never a forwardable
+`promoCode` string) are no longer stop questions. Everything else: decide it
+yourself, don't ask.
 
 ## Layout
 

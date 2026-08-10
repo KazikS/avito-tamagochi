@@ -1,0 +1,6 @@
+# Контекст сборки — корень репозитория (docker-compose.yaml → context: ../../),
+# поэтому node_modules и .git иначе улетают в контекст каждого docker build.
+.git
+frontend/node_modules
+frontend/dist
+backend/server

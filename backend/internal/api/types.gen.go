@@ -162,6 +162,7 @@ const (
 	PETISSLEEPING        ErrorCode = "PET_IS_SLEEPING"
 	REWARDALREADYCLAIMED ErrorCode = "REWARD_ALREADY_CLAIMED"
 	REWARDEXPIRED        ErrorCode = "REWARD_EXPIRED"
+	REWARDNOTCLAIMED     ErrorCode = "REWARD_NOT_CLAIMED"
 	REWARDNOTELIGIBLE    ErrorCode = "REWARD_NOT_ELIGIBLE"
 	TOKENEXPIRED         ErrorCode = "TOKEN_EXPIRED"
 	UNAUTHORIZED         ErrorCode = "UNAUTHORIZED"
@@ -190,6 +191,8 @@ func (e ErrorCode) Valid() bool {
 	case REWARDALREADYCLAIMED:
 		return true
 	case REWARDEXPIRED:
+		return true
+	case REWARDNOTCLAIMED:
 		return true
 	case REWARDNOTELIGIBLE:
 		return true
@@ -730,9 +733,11 @@ type DailySummary struct {
 	Streak     *Streak `json:"streak,omitempty"`
 	Tomorrow   *struct {
 		MultiplierWillBe *float32 `json:"multiplierWillBe,omitempty"`
-		NextReward       *Reward  `json:"nextReward,omitempty"`
-		StreakWillBe     *int     `json:"streakWillBe,omitempty"`
-		Tasks            *[]Task  `json:"tasks,omitempty"`
+
+		// NextReward Энтайтлмент, не промокод (docs/DECISIONS.md → 10.08): право на бонус привязано к user_id в reward_grants, кода, который можно переслать, в ответе нет вообще.
+		NextReward   *Reward `json:"nextReward,omitempty"`
+		StreakWillBe *int    `json:"streakWillBe,omitempty"`
+		Tasks        *[]Task `json:"tasks,omitempty"`
 	} `json:"tomorrow,omitempty"`
 	XpTotal *int `json:"xpTotal,omitempty"`
 }
@@ -948,20 +953,20 @@ type Profile struct {
 // Rarity defines model for Rarity.
 type Rarity string
 
-// Reward defines model for Reward.
+// Reward Энтайтлмент, не промокод (docs/DECISIONS.md → 10.08): право на бонус привязано к user_id в reward_grants, кода, который можно переслать, в ответе нет вообще.
 type Reward struct {
 	ClaimedAt *time.Time `json:"claimedAt,omitempty"`
 
 	// ConditionLabel ГОТОВЫЙ текст с сервера. Фронт не склеивает фразы из чисел
 	//
-	// Examples: Достигни 10 уровня
+	// Examples: Уровень 10
 	ConditionLabel string `json:"conditionLabel"`
 
 	// CosmeticId Если tier=cosmetic
 	CosmeticId  *string `json:"cosmeticId,omitempty"`
 	Description *string `json:"description,omitempty"`
 
-	// EtaDays Оценка сервера по темпу пользователя
+	// EtaDays Оценка сервера по темпу пользователя. Отсутствует, если сигнала недостаточно для честной оценки — не выдумывается
 	EtaDays   *int       `json:"etaDays,omitempty"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 	Id        string     `json:"id"`
@@ -970,19 +975,16 @@ type Reward struct {
 		Target  int                `json:"target"`
 		Unit    RewardProgressUnit `json:"unit"`
 	} `json:"progress"`
+	Status RewardStatus `json:"status"`
 
-	// PromoCode ТОЛЬКО при status claimed или used. В остальных случаях поле отсутствует
-	//
-	// Examples: AVI-7K3M-92XQ
-	PromoCode *string      `json:"promoCode,omitempty"`
-	RedeemUrl *string      `json:"redeemUrl,omitempty"`
-	Status    RewardStatus `json:"status"`
-
-	// Tier cosmetic — себестоимость 0 · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100
+	// Tier cosmetic — себестоимость 0, выдаётся напрямую · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100-дневного стрика. premium сегодня не встречается ни в одной награде каталога: вехи 100 без стрик-системы не существует, а выдумывать недостижимую награду нечестнее, чем не показывать её вовсе (docs/DECISIONS.md → 10.08)
 	Tier RewardTier `json:"tier"`
 
-	// Title Examples: Скидка 20% на Авито Доставку
+	// Title Examples: Скидка на Авито Доставку
 	Title string `json:"title"`
+
+	// UsedAt Когда награда применена (POST /rewards/{rewardId}/redeem-click). Отсутствует, пока status не used
+	UsedAt *time.Time `json:"usedAt,omitempty"`
 }
 
 // RewardProgressUnit defines model for Reward.Progress.Unit.
@@ -991,7 +993,7 @@ type RewardProgressUnit string
 // RewardStatus defines model for RewardStatus.
 type RewardStatus string
 
-// RewardTier cosmetic — себестоимость 0 · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100
+// RewardTier cosmetic — себестоимость 0, выдаётся напрямую · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100-дневного стрика. premium сегодня не встречается ни в одной награде каталога: вехи 100 без стрик-системы не существует, а выдумывать недостижимую награду нечестнее, чем не показывать её вовсе (docs/DECISIONS.md → 10.08)
 type RewardTier string
 
 // StatKey defines model for StatKey.
@@ -1106,6 +1108,7 @@ type RateLimited = ErrorEnvelope
 
 // RewardOk defines model for RewardOk.
 type RewardOk struct {
+	// Data Энтайтлмент, не промокод (docs/DECISIONS.md → 10.08): право на бонус привязано к user_id в reward_grants, кода, который можно переслать, в ответе нет вообще.
 	Data *Reward `json:"data,omitempty"`
 	Meta Meta    `json:"meta"`
 }
@@ -1200,7 +1203,7 @@ type GetRewardsParams struct {
 
 // PostRewardsRewardIdClaimParams defines parameters for PostRewardsRewardIdClaim.
 type PostRewardsRewardIdClaimParams struct {
-	// IdempotencyKey Обязателен: ретрай при плохой сети не должен выдать второй промокод.
+	// IdempotencyKey Обязателен: ретрай при плохой сети не должен выдать второй грант награды.
 	IdempotencyKey IdempotencyKeyRequired `json:"Idempotency-Key"`
 }
 

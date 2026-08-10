@@ -283,7 +283,7 @@
       "get": {
         "tags": ["rewards"],
         "summary": "Награды",
-        "description": "promoCode ОТСУТСТВУЕТ, пока status не claimed или used. До получения фронт рисует маску. Иначе коды собираются скрейпингом.\n\nconditionLabel и etaDays считает сервер: фронт не склеивает фразы из чисел, иначе смена экономики потребует правки клиента.",
+        "description": "Энтайтлмент, не промокод (решение 10.08, docs/DECISIONS.md): награда — право, привязанное к user_id через reward_grants, коду на экране взяться неоткуда.\n\nconditionLabel и etaDays считает сервер: фронт не склеивает фразы из чисел, иначе смена экономики потребует правки клиента.",
         "parameters": [ { "name": "status", "in": "query", "required": false,
           "schema": { "$ref": "#/components/schemas/RewardStatus" } } ],
         "responses": { "200": { "description": "Список наград", "content": { "application/json": { "schema": {
@@ -306,16 +306,14 @@
       "post": {
         "tags": ["rewards"],
         "summary": "Забрать награду",
-        "description": "Идемпотентно. Повтор с ТЕМ ЖЕ Idempotency-Key возвращает 200 и тот же промокод.\n\nПри другом ключе по уже полученной награде возвращается 409 REWARD_ALREADY_CLAIMED, но в data лежит ТОТ ЖЕ промокод — фронт открывает шит с кодом, а не показывает ошибку.\n\nЕсли tier=cosmetic, сервер сразу выдаёт предмет и шлёт по сокету cosmetic.granted.",
+        "description": "Идемпотентно. Повтор с ТЕМ ЖЕ Idempotency-Key возвращает 200 и ту же награду (status уже claimed или used — грант происходит не дважды).\n\nПри другом ключе по уже полученной награде возвращается 409 REWARD_ALREADY_CLAIMED, в data — та же награда, без выдумывания второго гранта — фронт открывает тот же экран, а не показывает ошибку.\n\nЕсли tier=cosmetic, сервер сразу выдаёт предмет и шлёт по сокету cosmetic.granted.",
         "parameters": [
           { "$ref": "#/components/parameters/RewardId" },
           { "$ref": "#/components/parameters/IdempotencyKeyRequired" }
         ],
         "responses": {
           "200": { "$ref": "#/components/responses/RewardOk" },
-          "403": { "description": "REWARD_NOT_ELIGIBLE — условие не выполнено", "content": { "application/json": { "schema": {
-            "$ref": "#/components/schemas/ErrorEnvelope" } } } },
-          "409": { "description": "REWARD_ALREADY_CLAIMED. В data — та же награда с промокодом", "content": { "application/json": { "schema": {
+          "409": { "description": "REWARD_NOT_ELIGIBLE (условие не выполнено) или REWARD_ALREADY_CLAIMED (в data — та же награда). Оба — состояние, не права доступа, поэтому не 403", "content": { "application/json": { "schema": {
             "allOf": [ { "$ref": "#/components/schemas/ErrorEnvelope" },
               { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Reward" } } } ] } } } },
           "410": { "description": "REWARD_EXPIRED", "content": { "application/json": { "schema": {
@@ -327,10 +325,14 @@
     "/rewards/{rewardId}/redeem-click": {
       "post": {
         "tags": ["rewards"],
-        "summary": "Лог перехода «Применить на Авито»",
-        "description": "Метрика конверсии. Реальное погашение происходит на стороне Авито, статус переходит в used отдельным серверным событием.",
+        "summary": "Применить награду",
+        "description": "В полном продукте — лог перехода «Применить на Авито», статус переходит в used отдельным серверным событием после реального погашения на стороне Авито. В этом MVP такого события нет неоткуда взяться (нет интеграции с настоящим Авито) — статус переходит в used сразу, синхронно; это явное упрощение MVP, а не тихая недоделка (docs/DECISIONS.md → 10.08).",
         "parameters": [ { "$ref": "#/components/parameters/RewardId" } ],
-        "responses": { "204": { "description": "Записано" } }
+        "responses": {
+          "200": { "$ref": "#/components/responses/RewardOk" },
+          "409": { "description": "REWARD_NOT_CLAIMED — награду сначала нужно забрать", "content": { "application/json": { "schema": {
+            "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
       }
     },
 
@@ -413,7 +415,7 @@
       "IdempotencyKeyRequired": {
         "name": "Idempotency-Key", "in": "header", "required": true,
         "schema": { "type": "string", "format": "uuid" },
-        "description": "Обязателен: ретрай при плохой сети не должен выдать второй промокод."
+        "description": "Обязателен: ретрай при плохой сети не должен выдать второй грант награды."
       },
       "TaskId":     { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string" } },
       "RewardId":   { "name": "rewardId", "in": "path", "required": true, "schema": { "type": "string" } },
@@ -485,7 +487,7 @@
           "VALIDATION_ERROR", "UNAUTHORIZED", "TOKEN_EXPIRED", "NOT_FOUND",
           "PET_ALREADY_EXISTS", "PET_IS_SLEEPING", "ACTION_LIMIT_REACHED", "ACTION_RATE_LIMITED",
           "EVENT_REJECTED", "REWARD_NOT_ELIGIBLE", "REWARD_ALREADY_CLAIMED", "REWARD_EXPIRED",
-          "COSMETIC_NOT_OWNED", "INTERNAL_ERROR"
+          "REWARD_NOT_CLAIMED", "COSMETIC_NOT_OWNED", "INTERNAL_ERROR"
         ]
       },
 
@@ -740,7 +742,7 @@
 
       "RewardTier": {
         "type": "string",
-        "description": "cosmetic — себестоимость 0 · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100",
+        "description": "cosmetic — себестоимость 0, выдаётся напрямую · soft — бонусы кошелька, мелкие скидки · premium — платные услуги Авито, только с 10 уровня и вехи 100-дневного стрика. premium сегодня не встречается ни в одной награде каталога: вехи 100 без стрик-системы не существует, а выдумывать недостижимую награду нечестнее, чем не показывать её вовсе (docs/DECISIONS.md → 10.08)",
         "enum": ["cosmetic", "soft", "premium"]
       },
 
@@ -749,23 +751,23 @@
       "Reward": {
         "type": "object",
         "required": ["id", "tier", "title", "conditionLabel", "progress", "status"],
+        "description": "Энтайтлмент, не промокод (docs/DECISIONS.md → 10.08): право на бонус привязано к user_id в reward_grants, кода, который можно переслать, в ответе нет вообще.",
         "properties": {
           "id": { "type": "string" },
           "tier": { "$ref": "#/components/schemas/RewardTier" },
-          "title": { "type": "string", "examples": ["Скидка 20% на Авито Доставку"] },
+          "title": { "type": "string", "examples": ["Скидка на Авито Доставку"] },
           "description": { "type": "string" },
-          "conditionLabel": { "type": "string", "examples": ["Достигни 10 уровня"],
+          "conditionLabel": { "type": "string", "examples": ["Уровень 10"],
             "description": "ГОТОВЫЙ текст с сервера. Фронт не склеивает фразы из чисел" },
           "progress": { "type": "object", "required": ["current", "target", "unit"],
             "properties": { "current": { "type": "integer" }, "target": { "type": "integer" },
               "unit": { "type": "string", "enum": ["level", "day", "task"] } } },
-          "etaDays": { "type": "integer", "description": "Оценка сервера по темпу пользователя" },
+          "etaDays": { "type": "integer", "description": "Оценка сервера по темпу пользователя. Отсутствует, если сигнала недостаточно для честной оценки — не выдумывается" },
           "status": { "$ref": "#/components/schemas/RewardStatus" },
           "cosmeticId": { "type": "string", "description": "Если tier=cosmetic" },
-          "promoCode": { "type": "string", "examples": ["AVI-7K3M-92XQ"],
-            "description": "ТОЛЬКО при status claimed или used. В остальных случаях поле отсутствует" },
-          "redeemUrl": { "type": "string", "format": "uri" },
           "claimedAt": { "type": "string", "format": "date-time" },
+          "usedAt": { "type": "string", "format": "date-time",
+            "description": "Когда награда применена (POST /rewards/{rewardId}/redeem-click). Отсутствует, пока status не used" },
           "expiresAt": { "type": "string", "format": "date-time" }
         }
       },

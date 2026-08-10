@@ -28,11 +28,37 @@ services:
       # Та же база, что и для локальных тестов; изнутри контейнера адрес — имя
       # сервиса, а не localhost.
       DATABASE_URL: postgres://${POSTGRES_USER:-tamagochi}:${POSTGRES_PASSWORD:-tamagochi}@postgres:5432/${POSTGRES_DB:-tamagochi}?sslmode=disable
+      # demo монтирует заглушку личности (cmd/demo_identity.go): без неё
+      # /pet отвечает 401 на любой запрос, потому что настоящего входа ещё
+      # нет. Переопределяется в APP_ENV=production, когда он появится.
+      APP_ENV: ${APP_ENV:-demo}
+      # Оба необязательны и по умолчанию пусты — ровно текущее поведение без
+      # этих строк. Раньше не пробрасывались вовсе: заданные в шелле перед
+      # `make up` значения молча не долетали бы до контейнера (README.md →
+      # «Деплой» их документирует, а сюда — нет), тихое расхождение
+      # документации и того, что реально запускается.
+      DEBUG_TOKEN: ${DEBUG_TOKEN:-}
+      GIGACHAT_AUTH_KEY: ${GIGACHAT_AUTH_KEY:-}
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - app_net
+
+  # Кейс требует «приложение поднимается через docker-compose» дословно —
+  # не только бэкенд. nginx отдаёт собранный статический бандл и проксирует
+  # /api, /debug, /ws на server (frontend/build/package/nginx.conf) — фронту
+  # незачем знать, что бэкенд живёт на другом порту/хосте.
+  frontend:
+    build:
+      context: ../../
+      dockerfile: frontend/build/package/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
     networks:
       - app_net
 

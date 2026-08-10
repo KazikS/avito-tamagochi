@@ -56,13 +56,21 @@ gen:  ## регенерация типов из docs/openapi.json (Go + TS)
 migrate:  ## накатить миграции (goose — уже используется в feat/auth)
 	cd backend && goose -dir migrations postgres "$$DATABASE_URL" up
 
-seed:  ## демо-данные: стрик, порог уровня, готовая награда, лидерборд
+# Проводит действия ЧЕРЕЗ internal/pet.Service (детерминированные actionId,
+# идемпотентно) — не INSERT напрямую. Пока НЕ сеет: стрик (системы всё ещё
+# нет) и claim/redeem наград (сама фича есть с 10.08, но сидер её не
+# использует — задел на потом, не решение) — честно ничего, не выдумка.
+# Сеет: несколько питомцев с разной историей ухода за несколько последних
+# суток — есть чем показать лидерборд (GET /leaderboard), сводку дня
+# (GET /summary/daily) и разные уровни доступности наград (GET /rewards).
+seed:  ## демо-данные: несколько питомцев, история ухода на неделю, лидерборд
 	@test -d backend/cmd/seed || { echo "seed: cmd/seed ещё не написан (docs/DECISIONS.md → несделанная работа)"; exit 1; }
 	cd backend && go run ./cmd/seed
 
+# Работает только когда сервер поднят с APP_ENV=demo (docker-compose.yaml —
+# уже дефолт, см. `make up`): вне демо-режима часы настоящие, эндпоинта нет.
 clock:  ## сдвинуть часы демо-стенда: make clock HOURS=26
-	@echo "clock: эндпоинт /v1/_debug/clock ещё не написан (docs/DECISIONS.md → несделанная работа)" >&2
-	curl -fsS -XPOST localhost:8080/v1/_debug/clock -d '{"advanceHours":$(or $(HOURS),24)}'
+	curl -fsS -XPOST localhost:8080/debug/clock/advance -d '{"advanceHours":$(or $(HOURS),24)}'
 
 test:  ## быстрый прогон (то же, что Stop-хук)
 	cd backend && go test ./...
@@ -94,11 +102,20 @@ lint:
 vuln:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+# Мутационная проверка: единственное доказательство, что тесты домена что-то
+# стерегут. Зелёный `go test` доказывает, что тесты выполнились, и ничего не
+# говорит о том, упали бы они на сломанном коде.
+mutation:  ## сломать домен намеренно и убедиться, что тесты краснеют
+	bash scripts/mutation-check.sh
+
 doctor:  ## что нужно поставить локально и чего не хватает
 	bash scripts/doctor.sh
 
 reconcile:  ## состояние docs/RECONCILIATION.md по коду, а не по галочкам
 	bash scripts/reconcile-check.sh
+
+invariants:  ## какие инварианты docs/ARCHITECTURE.md реально покрыты тестом
+	bash scripts/invariant-check.sh
 
 # Предупреждение, а не ошибка: гейт для человека включается одной командой,
 # но забыть её слишком легко, и тогда pre-push просто не существует.
@@ -117,6 +134,7 @@ verify: ## полный гейт: повторяет джоб backend из CI
 	$(MAKE) test-race
 	$(MAKE) lint
 	$(MAKE) vuln
+	$(MAKE) mutation
 	$(MAKE) hooks-test
 	@$(MAKE) --no-print-directory hooks-installed
 

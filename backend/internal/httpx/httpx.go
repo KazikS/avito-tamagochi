@@ -64,6 +64,20 @@ func Fail(w http.ResponseWriter, r *http.Request, status int, code api.ErrorCode
 	})
 }
 
+// FailWithData пишет ответ об ошибке вместе с данными в data — контракт
+// иногда требует это явно (REWARD_ALREADY_CLAIMED: «в data — та же награда»,
+// POST /rewards/{rewardId}/claim), чтобы фронт открыл тот же экран, а не
+// показал пустую ошибку поверх формы.
+func FailWithData(w http.ResponseWriter, r *http.Request, status int, code api.ErrorCode, message string, data any) {
+	write(w, status, struct {
+		Data any      `json:"data,omitempty"`
+		Meta api.Meta `json:"meta"`
+	}{
+		Data: data,
+		Meta: meta(r, status, message, &code),
+	})
+}
+
 // meta собирает Meta. Code берётся из того же status, что уйдёт в WriteHeader.
 func meta(r *http.Request, status int, message string, code *api.ErrorCode) api.Meta {
 	m := api.Meta{

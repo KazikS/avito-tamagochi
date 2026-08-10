@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"tamagochi/internal/api"
+	"tamagochi/pkg/pgtest"
 )
 
 // configPath — путь целиком, литералом.
@@ -168,7 +169,7 @@ func TestMethodNotAllowedCarriesAllowHeader(t *testing.T) {
 // Роутер должен собираться без ошибки на константах, с которыми он поедет
 // в прод: DefaultCurve и DefaultDailyCareXPCap проходят Validate.
 func TestNewRouterBuildsWithShippedConstants(t *testing.T) {
-	if _, err := newRouter(); err != nil {
+	if _, err := newRouter(pgtest.Pool(t)); err != nil {
 		t.Fatalf("newRouter на боевых константах: %v", err)
 	}
 }
